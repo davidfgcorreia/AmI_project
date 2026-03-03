@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  # ── MQTT Broker ──
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+
+  # ── FastAPI Backend ──
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MQTT_BROKER_HOST=mqtt
+    depends_on:
+      - mqtt
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  # ── React Frontend (dev) ──
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped

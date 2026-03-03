@@ -1,0 +1,51 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# ── Virtual environments ──
+venv/
+.venv/
+env/
+
+# ── Backend ──
+backend/venv/
+backend/store.db
+backend/yolov8*.pt
+backend/app/static/shelf_images/*
+!backend/app/static/shelf_images/.gitkeep
+
+# ── Frontend ──
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Environment variables ──
+.env
+.env.local
+.env.*.local
+
+# ── Docker ──
+docker-compose.override.yml
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── OS ──
+.DS_Store
+desktop.ini
