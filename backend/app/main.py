@@ -30,6 +30,9 @@ logger = logging.getLogger("ire")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    logger.info("═══════════════════════════════════════════════")
+    logger.info("  Intelligent Retail Ecosystem – starting up")
+    logger.info("═══════════════════════════════════════════════")
     logger.info("Creating database tables …")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -41,7 +44,11 @@ async def lifespan(app: FastAPI):
     from .services.mqtt_client import mqtt_listener
     mqtt_task = asyncio.create_task(mqtt_listener())
 
-    logger.info("✔  Backend ready")
+    from .core.config import STORE_WIDTH, STORE_HEIGHT, GRID_RESOLUTION, GATEWAY_POSITIONS
+    logger.info("Store: %.0f×%.0f m  grid=%.1fm  gateways=%s",
+                STORE_WIDTH, STORE_HEIGHT, GRID_RESOLUTION,
+                list(GATEWAY_POSITIONS.keys()))
+    logger.info("✔  Backend ready – listening on http://0.0.0.0:8000")
     yield
 
     # Shutdown

@@ -10,7 +10,9 @@ from ..models.schemas import ShelfAnalysis
 from ..services.cv_detection import analyse_shelf_image
 from ..core.database import get_db
 import json
+import logging
 
+logger = logging.getLogger("vision")
 router = APIRouter(prefix="/api", tags=["Computer Vision"])
 
 
@@ -32,10 +34,18 @@ async def scan_shelf(
         raise HTTPException(404, "Shelf not found")
 
     image_bytes = await image.read()
+    logger.info("[CV] 📷 Scan request  shelf=%d  image_size=%d bytes  highlight='%s'",
+                shelf_id, len(image_bytes), highlight)
+
     analysis = analyse_shelf_image(
         image_bytes, shelf_id,
         highlight_label=highlight or None,
     )
+    logger.info("[CV] 🔬 YOLO detected %d objects  file=%s",
+                len(analysis['detections']), analysis['filename'])
+    for det in analysis['detections']:
+        logger.info("[CV]    → %s  conf=%.1f%%  bbox=%s",
+                    det['label'], det['confidence'] * 100, det['bbox'])
 
     # Persist record
     record = ShelfImage(

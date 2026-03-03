@@ -24,6 +24,8 @@ backend/app/static/shelf_images/*
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/package-lock.json
+frontend/yarn.lock
 
 # ── IDE / Editor ──
 .vscode/
@@ -45,6 +47,7 @@ docker-compose.override.yml
 # ── Logs ──
 *.log
 npm-debug.log*
+backend/logs/
 
 # ── OS ──
 .DS_Store

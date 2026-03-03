@@ -6,8 +6,11 @@ Supports multi-product route optimisation (nearest-neighbour TSP heuristic).
 """
 import heapq
 import math
+import logging
 from typing import Optional
 from ..core.config import STORE_WIDTH, STORE_HEIGHT, GRID_RESOLUTION
+
+logger = logging.getLogger("pathfinding")
 
 # ── Grid setup ──
 COLS = int(STORE_WIDTH / GRID_RESOLUTION)
@@ -34,10 +37,13 @@ def register_obstacle(x: float, y: float, w: float = 1.0, h: float = 1.0):
     margin = GRID_RESOLUTION
     x0, y0 = world_to_grid(x - w / 2 - margin, y - h / 2 - margin)
     x1, y1 = world_to_grid(x + w / 2 + margin, y + h / 2 + margin)
+    cells = 0
     for r in range(min(x0, x1), max(x0, x1) + 1):
         for c in range(min(y0, y1), max(y0, y1) + 1):
             if 0 <= r < ROWS and 0 <= c < COLS:
                 _obstacle_grid[r][c] = 1
+                cells += 1
+    logger.info("[PATH] 🧱 Obstacle at (%.1f, %.1f) size %.1f×%.1f → %d grid cells blocked", x, y, w, h, cells)
 
 
 def _heuristic(a: tuple[int, int], b: tuple[int, int]) -> float:
@@ -60,6 +66,8 @@ def astar(start_xy: tuple[float, float],
     """
     sr, sc = world_to_grid(*start_xy)
     gr, gc = world_to_grid(*goal_xy)
+    logger.info("[PATH] 🛤️ A*  start=(%.1f,%.1f)→grid(%d,%d)  goal=(%.1f,%.1f)→grid(%d,%d)",
+                start_xy[0], start_xy[1], sr, sc, goal_xy[0], goal_xy[1], gr, gc)
 
     # Ensure start/goal are walkable (force them open)
     _obstacle_grid[sr][sc] = 0
@@ -81,7 +89,10 @@ def astar(start_xy: tuple[float, float],
                 path_grid.append(cur)
             path_grid.reverse()
             # Simplify: convert to world & skip collinear points
-            return _simplify([grid_to_world(r, c) for r, c in path_grid])
+            simplified = _simplify([grid_to_world(r, c) for r, c in path_grid])
+            logger.info("[PATH] ✔ A* found path: %d raw → %d simplified waypoints",
+                        len(path_grid), len(simplified))
+            return simplified
 
         for nr, nc in _neighbors(cr, cc):
             move_cost = 1.414 if (nr != cr and nc != cc) else 1.0
@@ -92,6 +103,7 @@ def astar(start_xy: tuple[float, float],
                 f = tentative + _heuristic((nr, nc), (gr, gc))
                 heapq.heappush(open_set, (f, nr, nc))
 
+    logger.warning("[PATH] ✖ A* found no path from (%d,%d) to (%d,%d)", sr, sc, gr, gc)
     return None  # no path
 
 
@@ -162,6 +174,8 @@ def multi_product_route(start: tuple[float, float],
                 best_idx = i
 
         target = remaining.pop(best_idx)
+        logger.info("[PATH] 🛤️ Segment %d → target (%.1f, %.1f)  nearest_dist=%.2f",
+                    len(targets) - len(remaining), target[0], target[1], best_dist)
         segment = astar(current, target)
         if segment:
             if full_path:

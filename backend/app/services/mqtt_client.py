@@ -54,7 +54,9 @@ async def mqtt_listener():
 
                         if sid not in _ble_buffer:
                             _ble_buffer[sid] = {}
+                            logger.info("[MQTT] 🆕 New session via MQTT: %s", sid)
                         _ble_buffer[sid][gw] = rssi
+                        logger.info("[MQTT] 📡 gw=%s  session=%s  rssi=%+.1f dBm", gw, sid, rssi)
 
                     except (json.JSONDecodeError, KeyError) as exc:
                         logger.debug("Bad MQTT payload: %s", exc)

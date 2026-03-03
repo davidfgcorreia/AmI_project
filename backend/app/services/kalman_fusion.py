@@ -7,8 +7,11 @@ Fuses BLE-derived absolute position with IMU-based Pedestrian Dead Reckoning
 State vector: [x, y, vx, vy]
 """
 import math
+import logging
 import numpy as np
 from ..core.config import KALMAN_PROCESS_NOISE, KALMAN_MEASUREMENT_NOISE
+
+logger = logging.getLogger("kalman")
 
 # Average human step length (m)
 STEP_LENGTH = 0.65
@@ -65,6 +68,8 @@ class KalmanTracker:
 
         self.x = F @ self.x
         self.P = F @ self.P @ F.T + self.Q
+        logger.debug("[KALMAN] PDR predict  heading=%.1f°  steps=%d  dx=%.2f dy=%.2f → (%.2f, %.2f)",
+                     heading_deg, steps, dx, dy, self.x[0], self.x[1])
 
     def update_ble(self, ble_x: float, ble_y: float):
         """Correction step using BLE trilateration measurement."""
@@ -72,6 +77,7 @@ class KalmanTracker:
             self.x[0] = ble_x
             self.x[1] = ble_y
             self._initialised = True
+            logger.info("[KALMAN] 🆕 Initialised at (%.2f, %.2f)", ble_x, ble_y)
             return
 
         z = np.array([ble_x, ble_y])
@@ -82,6 +88,8 @@ class KalmanTracker:
         self.x = self.x + K @ y
         I = np.eye(4)
         self.P = (I - K @ self.H) @ self.P
+        logger.info("[KALMAN] BLE update  meas=(%.2f, %.2f)  innov=(%.2f, %.2f) → fused=(%.2f, %.2f)  acc=%.2fm",
+                    ble_x, ble_y, float(y[0]), float(y[1]), self.x[0], self.x[1], self.accuracy)
 
     @property
     def position(self) -> tuple[float, float]:
@@ -100,8 +108,11 @@ _trackers: dict[str, KalmanTracker] = {}
 def get_tracker(session_id: str) -> KalmanTracker:
     if session_id not in _trackers:
         _trackers[session_id] = KalmanTracker()
+        logger.info("[KALMAN] ➕ New tracker for session=%s  (total=%d)", session_id, len(_trackers))
     return _trackers[session_id]
 
 
 def remove_tracker(session_id: str):
-    _trackers.pop(session_id, None)
+    removed = _trackers.pop(session_id, None)
+    if removed:
+        logger.info("[KALMAN] ➖ Removed tracker for session=%s  (remaining=%d)", session_id, len(_trackers))
