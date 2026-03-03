@@ -19,6 +19,7 @@ backend/store.db
 backend/yolov8*.pt
 backend/app/static/shelf_images/*
 !backend/app/static/shelf_images/.gitkeep
+backend/app/store.db
 
 # ── Frontend ──
 frontend/node_modules/

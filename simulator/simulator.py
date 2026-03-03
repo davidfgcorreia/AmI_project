@@ -256,10 +256,10 @@ async def run_http_mode(session_id: str, path: list[tuple[float, float]],
 
 async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
                         interval: float, broker_host: str, broker_port: int,
-                        quiet: bool):
+                        quiet: bool, backend_url: str = "http://localhost:8000"):
     """
     Publishes RSSI to MQTT broker (like real ESP32 gateways).
-    Also sends IMU via WebSocket.
+    Also sends IMU via WebSocket (like the phone).
     """
     try:
         import aiomqtt  # type: ignore[import-untyped]
@@ -267,8 +267,19 @@ async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
         print('  ✗ aiomqtt not installed. Run: pip install aiomqtt')
         sys.exit(1)
 
+    import websockets  # type: ignore
+
     state = SimState(x=path[0][0], y=path[0][1])
     steps = interpolate_path(path)
+
+    # Connect WebSocket for IMU (just like the phone app does)
+    ws_url = backend_url.replace('http', 'ws') + f'/ws/track/{session_id}'
+    ws = None
+    try:
+        ws = await websockets.connect(ws_url)
+        print(f'  ✔ WebSocket connected: {ws_url}')
+    except Exception as e:
+        print(f'  ⚠ WebSocket failed ({e}) – MQTT-only, no fused position feedback')
 
     async with aiomqtt.Client(hostname=broker_host, port=broker_port) as mqtt:
         print(f'  ✔ MQTT connected: {broker_host}:{broker_port}')
@@ -288,14 +299,29 @@ async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
                 rssi_str = '  '.join(f'{r["gateway_id"][-1]}:{r["rssi"]:+.0f}dBm' for r in readings)
                 print(f'  Step {i+1}/{len(steps)}  heading={state.heading:.0f}°  {rssi_str}')
 
-            # Publish each gateway reading to MQTT
+            # Publish each gateway reading to MQTT (simulates ESP32 gateways)
             for reading in readings:
                 await mqtt.publish(
                     "ire/ble/rssi",
                     payload=json.dumps(reading).encode(),
                 )
 
+            # Send IMU via WebSocket (simulates the phone)
+            if ws:
+                try:
+                    imu = generate_imu_data(state)
+                    await ws.send(json.dumps(imu))
+                    resp = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                    if not quiet:
+                        data = json.loads(resp)
+                        print(f'  → Fused position: ({data.get("x", "?")}, {data.get("y", "?")}) ±{data.get("accuracy", "?")}m')
+                except Exception:
+                    pass
+
             await asyncio.sleep(interval)
+
+    if ws:
+        await ws.close()
 
     print(f'\n  ✔ Simulation complete – {state.total_steps} steps')
 
@@ -368,6 +394,7 @@ examples:
                 asyncio.run(run_mqtt_mode(
                     args.session, path, args.speed,
                     args.broker, args.broker_port, args.quiet,
+                    backend_url=args.backend,
                 ))
             else:
                 asyncio.run(run_http_mode(
