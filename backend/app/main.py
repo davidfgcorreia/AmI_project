@@ -40,6 +40,9 @@ async def lifespan(app: FastAPI):
     # Seed demo data if empty
     await _seed_demo_data()
 
+    # Register all shelves as pathfinding obstacles
+    await _register_shelf_obstacles()
+
     # Start MQTT listener in background
     from .services.mqtt_client import mqtt_listener
     mqtt_task = asyncio.create_task(mqtt_listener())
@@ -143,3 +146,18 @@ async def _seed_demo_data():
         db.add_all(products)
         await db.commit()
         logger.info("Seeded %d shelves and %d products", len(shelves), len(products))
+
+
+async def _register_shelf_obstacles():
+    """Load all shelves from DB and mark them on the pathfinding grid."""
+    from .models.database import Shelf
+    from .services.pathfinding import register_obstacle
+    from sqlalchemy import select
+
+    async with SessionLocal() as db:
+        result = await db.execute(select(Shelf))
+        shelves = result.scalars().all()
+
+    for s in shelves:
+        register_obstacle(float(s.x), float(s.y), float(s.width), float(s.height))
+    logger.info("Registered %d shelf obstacles on pathfinding grid", len(shelves))

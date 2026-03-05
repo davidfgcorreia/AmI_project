@@ -113,11 +113,17 @@ async def tracking_ws(ws: WebSocket, session_id: str):
         logger.error("[WS] ✖ Error session=%s: %s", session_id, exc)
     finally:
         _connections.pop(session_id, None)
-        close_csv_logger(session_id)
+        close_csv_logger(session_id, instance=csv_log)
         remove_tracker(session_id)
 
 
 # ── REST endpoint for BLE readings (used by simulator / ESP32 HTTP fallback) ──
+
+@router.get("/api/ble/buffer")
+async def get_ble_buffer_debug():
+    """Debug endpoint – shows current BLE buffer state."""
+    return get_ble_buffer()
+
 
 @router.post("/api/ble/reading")
 async def post_ble_reading(reading: BLEReading):

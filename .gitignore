@@ -53,3 +53,5 @@ backend/logs/
 # ── OS ──
 .DS_Store
 desktop.ini
+
+CLAUDE.md

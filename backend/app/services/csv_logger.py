@@ -117,7 +117,12 @@ def get_csv_logger(session_id: str) -> SessionCSVLogger:
     return _loggers[session_id]
 
 
-def close_csv_logger(session_id: str):
-    csv_log = _loggers.pop(session_id, None)
-    if csv_log:
-        csv_log.close()
+def close_csv_logger(session_id: str, instance: SessionCSVLogger | None = None):
+    """Close the logger for session_id, but only if it matches `instance` (prevents race conditions)."""
+    current = _loggers.get(session_id)
+    if current is None:
+        return
+    if instance is not None and current is not instance:
+        return  # a new session already replaced this logger — don't close it
+    _loggers.pop(session_id, None)
+    current.close()

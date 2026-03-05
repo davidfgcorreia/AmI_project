@@ -18,7 +18,7 @@ import { connectTracking, disconnectTracking, isConnected } from './services/web
 import useIMU from './hooks/useIMU';
 
 function generateSessionId() {
-  return 'session-' + Math.random().toString(36).slice(2, 10);
+  return 'ire-user';
 }
 
 export default function App() {

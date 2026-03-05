@@ -152,9 +152,6 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     canvas.getContext('2d').scale(dpr, dpr);
-    // Store logical size for drawing
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
 
     draw();
     return () => cancelAnimationFrame(animRef.current);

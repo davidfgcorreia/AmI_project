@@ -8,15 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.database import get_db
 from ..models.database import Product, Shelf, ShelfImage
+from ..models.schemas import NavigateRequest, NavigateResponse, NavStep, ProductOut
+from ..services.kalman_fusion import get_tracker
+from ..services.pathfinding import multi_product_route, astar, path_distance
 
 logger = logging.getLogger("nav")
-from ..models.schemas import (
-    NavigateRequest, NavigateResponse, NavStep, ProductOut,
-)
-from ..services.pathfinding import multi_product_route, astar, path_distance
-from ..services.kalman_fusion import get_tracker
-from ..core.database import get_db
 
 router = APIRouter(prefix="/api", tags=["Navigation"])
 

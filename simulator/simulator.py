@@ -118,10 +118,12 @@ class SimState:
 
 # ── RSSI generation ────────────────────────────────────────────────────
 
-def generate_rssi_readings(pos: tuple[float, float], session_id: str) -> list[dict]:
+def generate_rssi_readings(pos: tuple[float, float], session_id: str,
+                           gateways: dict | None = None) -> list[dict]:
     """Generate one RSSI reading per gateway for the current position."""
+    gateways = gateways or GATEWAY_POSITIONS
     readings = []
-    for gw_id, gw_pos in GATEWAY_POSITIONS.items():
+    for gw_id, gw_pos in gateways.items():
         d = distance(pos, gw_pos)
         rssi = distance_to_rssi(d)
         readings.append({
@@ -186,7 +188,8 @@ def print_store_map(pos: tuple[float, float], gateways: dict):
 # ── HTTP mode (no MQTT) ────────────────────────────────────────────────
 
 async def run_http_mode(session_id: str, path: list[tuple[float, float]],
-                        interval: float, backend_url: str, quiet: bool):
+                        interval: float, backend_url: str, quiet: bool,
+                        gateways: dict | None = None):
     """
     Posts BLE readings to the backend API and sends IMU via WebSocket.
     This simulates both the ESP32s and the phone at once.
@@ -194,6 +197,7 @@ async def run_http_mode(session_id: str, path: list[tuple[float, float]],
     import httpx
     import websockets  # type: ignore
 
+    active_gateways = gateways or GATEWAY_POSITIONS
     state = SimState(x=path[0][0], y=path[0][1])
     steps = interpolate_path(path)
 
@@ -216,15 +220,15 @@ async def run_http_mode(session_id: str, path: list[tuple[float, float]],
             state.step_count = 1 if distance(prev, pos) > 0.3 else 0
             state.total_steps += state.step_count
 
-            # 1. Generate & post BLE RSSI (simulates ESP32 gateways)
-            readings = generate_rssi_readings(pos, session_id)
+            # 1. Generate & post BLE RSSI (simulates selected ESP32 gateways)
+            readings = generate_rssi_readings(pos, session_id, active_gateways)
 
             if not quiet:
-                print_store_map(pos, GATEWAY_POSITIONS)
+                print_store_map(pos, active_gateways)
                 rssi_str = '  '.join(f'{r["gateway_id"][-1]}:{r["rssi"]:+.0f}dBm' for r in readings)
                 print(f'  Step {i+1}/{len(steps)}  heading={state.heading:.0f}°  {rssi_str}')
 
-            # Post each reading (simulates 3 ESP32s sending data)
+            # Post each reading (simulates selected ESP32s sending data)
             for reading in readings:
                 try:
                     await client.post('/api/ble/reading', json=reading)
@@ -256,7 +260,8 @@ async def run_http_mode(session_id: str, path: list[tuple[float, float]],
 
 async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
                         interval: float, broker_host: str, broker_port: int,
-                        quiet: bool, backend_url: str = "http://localhost:8000"):
+                        quiet: bool, backend_url: str = "http://localhost:8000",
+                        gateways: dict | None = None):
     """
     Publishes RSSI to MQTT broker (like real ESP32 gateways).
     Also sends IMU via WebSocket (like the phone).
@@ -269,6 +274,7 @@ async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
 
     import websockets  # type: ignore
 
+    active_gateways = gateways or GATEWAY_POSITIONS
     state = SimState(x=path[0][0], y=path[0][1])
     steps = interpolate_path(path)
 
@@ -292,10 +298,10 @@ async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
             state.step_count = 1 if distance(prev, pos) > 0.3 else 0
             state.total_steps += state.step_count
 
-            readings = generate_rssi_readings(pos, session_id)
+            readings = generate_rssi_readings(pos, session_id, active_gateways)
 
             if not quiet:
-                print_store_map(pos, GATEWAY_POSITIONS)
+                print_store_map(pos, active_gateways)
                 rssi_str = '  '.join(f'{r["gateway_id"][-1]}:{r["rssi"]:+.0f}dBm' for r in readings)
                 print(f'  Step {i+1}/{len(steps)}  heading={state.heading:.0f}°  {rssi_str}')
 
@@ -374,9 +380,21 @@ examples:
                         help='Suppress the ASCII map display')
     parser.add_argument('--loop', action='store_true',
                         help='Loop the path indefinitely')
+    parser.add_argument('--gateways', nargs='+', metavar='GW',
+                        help='Only simulate these gateways (e.g. --gateways esp32_C)')
     args = parser.parse_args()
 
     path = DEFAULT_PATH
+
+    if args.gateways:
+        unknown = [g for g in args.gateways if g not in GATEWAY_POSITIONS]
+        if unknown:
+            print(f'  ✗ Unknown gateway(s): {", ".join(unknown)}')
+            print(f'    Valid options: {", ".join(GATEWAY_POSITIONS.keys())}')
+            sys.exit(1)
+        active_gateways = {g: GATEWAY_POSITIONS[g] for g in args.gateways}
+    else:
+        active_gateways = None  # all gateways
 
     print('═' * 54)
     print('  Intelligent Retail Ecosystem – Simulator')
@@ -384,7 +402,8 @@ examples:
     print(f'  Mode:       {"MQTT" if args.mqtt else "HTTP"}')
     print(f'  Session ID: {args.session}')
     print(f'  Step delay: {args.speed}s')
-    print(f'  Gateways:   {", ".join(GATEWAY_POSITIONS.keys())}')
+    gw_names = ", ".join(active_gateways.keys()) if active_gateways else ", ".join(GATEWAY_POSITIONS.keys())
+    print(f'  Gateways:   {gw_names}')
     print(f'  Path:       {len(path)} waypoints → {len(interpolate_path(path))} steps')
     print('─' * 54)
 
@@ -395,11 +414,13 @@ examples:
                     args.session, path, args.speed,
                     args.broker, args.broker_port, args.quiet,
                     backend_url=args.backend,
+                    gateways=active_gateways,
                 ))
             else:
                 asyncio.run(run_http_mode(
                     args.session, path, args.speed,
                     args.backend, args.quiet,
+                    gateways=active_gateways,
                 ))
             if not args.loop:
                 break

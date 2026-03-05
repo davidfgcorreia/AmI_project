@@ -1,6 +1,7 @@
 """
 Core configuration – environment variables and constants.
 """
+import os
 from pathlib import Path
 
 # ── Paths ──
@@ -9,7 +10,7 @@ STATIC_DIR = BASE_DIR / "app" / "static"
 SHELF_IMG_DIR = STATIC_DIR / "shelf_images"
 
 # ── MQTT ──
-MQTT_BROKER_HOST = "localhost"
+MQTT_BROKER_HOST = os.environ.get("MQTT_BROKER_HOST", "localhost")
 MQTT_BROKER_PORT = 1883
 MQTT_TOPIC_BLE = "ire/ble/rssi"          # ESP32 publishes here
 
