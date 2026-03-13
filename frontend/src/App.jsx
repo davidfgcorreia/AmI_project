@@ -8,17 +8,18 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import FloorMap from './components/FloorMap';
+import { getGateways } from './services/api';
 import SearchBar from './components/SearchBar';
 import ProductList from './components/ProductList';
 import ShelfView from './components/ShelfView';
 import StatusBar from './components/StatusBar';
 import ScanUpload from './components/ScanUpload';
 import { getProducts, getShelves, navigate as apiNavigate } from './services/api';
-import { connectTracking, disconnectTracking, isConnected } from './services/websocket';
+import { connectTracking, disconnectTracking, isConnected, connectGateways, disconnectGateways } from './services/websocket';
 import useIMU from './hooks/useIMU';
 
 function generateSessionId() {
-  return 'ire-user';
+  return 'A32 de David';
 }
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
   const [sessionId] = useState(() => generateSessionId());
   const [userPos, setUserPos] = useState(null);
   const [shelves, setShelves] = useState([]);
+  const [beacons, setBeacons] = useState([]);
   const [products, setProducts] = useState([]);
   const [navPath, setNavPath] = useState([]);
   const [navTargets, setNavTargets] = useState([]);
@@ -42,8 +44,16 @@ export default function App() {
   useEffect(() => {
     getShelves().then(setShelves).catch(console.error);
 
+    // Fetch gateways/beacons from backend
+    getGateways().then(setBeacons).catch((err) => console.error('getGateways error', err));
+
     connectTracking(sessionId, (pos) => {
       setUserPos(pos);
+    });
+
+    // Connect to gateways WS for live updates
+    connectGateways((items) => {
+      setBeacons(items || []);
     });
 
     // Periodic connection check
@@ -53,6 +63,7 @@ export default function App() {
 
     return () => {
       disconnectTracking();
+      disconnectGateways();
       clearInterval(checkIntervalRef.current);
     };
   }, [sessionId]);
@@ -138,6 +149,7 @@ export default function App() {
               userPos={userPos}
               path={navPath}
               targets={navTargets}
+              beacons={beacons}
             />
 
             {navPath.length > 0 && (

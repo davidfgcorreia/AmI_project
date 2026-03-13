@@ -13,10 +13,17 @@ from ..models.database import Product, Shelf, ShelfImage
 from ..models.schemas import NavigateRequest, NavigateResponse, NavStep, ProductOut
 from ..services.kalman_fusion import get_tracker
 from ..services.pathfinding import multi_product_route, astar, path_distance
+from ..services.gateway_manager import get_positions as get_gateway_positions
 
 logger = logging.getLogger("nav")
 
 router = APIRouter(prefix="/api", tags=["Navigation"])
+
+
+@router.get('/gateways')
+async def get_gateways():
+    """Return current BLE gateway positions (from runtime manager)."""
+    return get_gateway_positions()
 
 
 @router.post("/navigate", response_model=NavigateResponse)
