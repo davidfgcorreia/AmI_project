@@ -1,0 +1,163 @@
+{
+  "dairy": [
+    "Whole Milk", "Skim Milk", "2% Milk", "Oat Milk", "Almond Milk", "Soy Milk",
+    "Coconut Milk", "Rice Milk", "Heavy Cream", "Sour Cream", "Whipping Cream",
+    "Butter", "Salted Butter", "Unsalted Butter", "Margarine", "Ghee",
+    "Cheddar Cheese", "Mozzarella Cheese", "Parmesan Cheese", "Brie Cheese",
+    "Gouda Cheese", "Swiss Cheese", "Feta Cheese", "Ricotta Cheese",
+    "Cream Cheese", "Cottage Cheese", "Provolone Cheese", "Blue Cheese",
+    "Plain Yogurt", "Greek Yogurt", "Strawberry Yogurt", "Blueberry Yogurt",
+    "Vanilla Yogurt", "Mango Yogurt", "Peach Yogurt", "Coconut Yogurt",
+    "Eggs (dozen)", "Free-Range Eggs", "Quail Eggs", "Condensed Milk",
+    "Evaporated Milk", "Powdered Milk", "Kefir", "Buttermilk", "Half and Half"
+  ],
+  "juices": [
+    "Orange Juice", "Apple Juice", "Grape Juice", "Pineapple Juice",
+    "Mango Juice", "Cranberry Juice", "Pomegranate Juice", "Grapefruit Juice",
+    "Tomato Juice", "Carrot Juice", "Watermelon Juice", "Peach Juice",
+    "Pear Juice", "Lemon Juice", "Lime Juice", "Cherry Juice",
+    "Passion Fruit Juice", "Guava Juice", "Papaya Juice", "Coconut Water",
+    "Green Juice", "Beet Juice", "Celery Juice", "Cucumber Juice",
+    "Mixed Fruit Juice", "Berry Mix Juice", "Tropical Mix Juice",
+    "Lemonade", "Iced Tea", "Sparkling Water", "Tonic Water", "Club Soda",
+    "Orange Juice with Pulp", "Apple Cider", "Vegetable Juice"
+  ],
+  "fruits": [
+    "Apple", "Banana", "Orange", "Strawberry", "Blueberry", "Raspberry",
+    "Blackberry", "Grape", "Watermelon", "Cantaloupe", "Honeydew",
+    "Pineapple", "Mango", "Papaya", "Kiwi", "Peach", "Nectarine",
+    "Plum", "Cherry", "Pear", "Avocado", "Lemon", "Lime", "Grapefruit",
+    "Pomegranate", "Fig", "Date", "Coconut", "Lychee", "Dragon Fruit",
+    "Passion Fruit", "Guava", "Jackfruit", "Starfruit", "Persimmon",
+    "Apricot", "Clementine", "Tangerine", "Mandarin", "Quince",
+    "Mulberry", "Gooseberry", "Cranberry", "Elderberry", "Rambutan"
+  ],
+  "vegetables": [
+    "Carrot", "Broccoli", "Spinach", "Kale", "Lettuce", "Cabbage",
+    "Cauliflower", "Brussels Sprouts", "Celery", "Cucumber", "Zucchini",
+    "Eggplant", "Bell Pepper", "Red Pepper", "Yellow Pepper", "Chili Pepper",
+    "Tomato", "Cherry Tomato", "Onion", "Red Onion", "Green Onion", "Leek",
+    "Garlic", "Ginger", "Potato", "Sweet Potato", "Yam", "Beet",
+    "Radish", "Turnip", "Parsnip", "Asparagus", "Artichoke",
+    "Pea", "Green Bean", "Edamame", "Corn", "Mushroom", "Portobello",
+    "Shiitake Mushroom", "Arugula", "Bok Choy", "Fennel", "Watercress",
+    "Swiss Chard", "Collard Greens", "Endive", "Radicchio", "Pumpkin",
+    "Butternut Squash", "Acorn Squash", "Spaghetti Squash"
+  ],
+  "bakery": [
+    "White Bread", "Whole Wheat Bread", "Sourdough Bread", "Rye Bread",
+    "Multigrain Bread", "Baguette", "Ciabatta", "Focaccia", "Pita Bread",
+    "Naan", "Tortilla", "Bagel", "English Muffin", "Croissant",
+    "Chocolate Croissant", "Cinnamon Roll", "Danish Pastry", "Donut",
+    "Glazed Donut", "Blueberry Muffin", "Chocolate Chip Muffin", "Bran Muffin",
+    "Banana Bread", "Zucchini Bread", "Cornbread", "Pretzel", "Breadstick",
+    "Cake", "Chocolate Cake", "Cheesecake", "Pound Cake", "Carrot Cake",
+    "Brownie", "Cookie", "Chocolate Chip Cookie", "Oatmeal Cookie",
+    "Macaron", "Eclair", "Tart", "Pie Crust", "Waffle"
+  ],
+  "meat_and_fish": [
+    "Chicken Breast", "Chicken Thigh", "Chicken Wings", "Whole Chicken",
+    "Ground Beef", "Beef Steak", "Ribeye Steak", "Sirloin Steak", "T-Bone Steak",
+    "Beef Ribs", "Beef Brisket", "Pork Chops", "Pork Ribs", "Pork Tenderloin",
+    "Bacon", "Ham", "Sausage", "Chorizo", "Salami", "Pepperoni",
+    "Turkey Breast", "Ground Turkey", "Duck Breast", "Lamb Chops", "Lamb Rack",
+    "Veal Cutlet", "Salmon Fillet", "Tuna Steak", "Cod Fillet", "Tilapia",
+    "Shrimp", "Lobster", "Crab", "Scallops", "Mussels", "Clams", "Oysters",
+    "Sardines", "Trout", "Halibut", "Sea Bass", "Swordfish", "Octopus", "Squid"
+  ],
+  "snacks_and_chips": [
+    "Potato Chips", "Tortilla Chips", "Corn Chips", "Pita Chips",
+    "Pretzels", "Popcorn", "Butter Popcorn", "Caramel Popcorn",
+    "Crackers", "Graham Crackers", "Rice Cakes", "Granola Bar",
+    "Protein Bar", "Cereal Bar", "Fruit Bar", "Chocolate Bar",
+    "Milk Chocolate", "Dark Chocolate", "White Chocolate", "Gummy Bears",
+    "Gummy Worms", "Jelly Beans", "M&Ms", "Skittles", "Snickers",
+    "Kit Kat", "Oreos", "Peanut Butter Cups", "Twix", "Reese's Pieces",
+    "Almonds", "Cashews", "Peanuts", "Walnuts", "Pistachios",
+    "Mixed Nuts", "Trail Mix", "Sunflower Seeds", "Pumpkin Seeds",
+    "Dried Mango", "Dried Cranberry", "Raisins", "Dried Apricot"
+  ],
+  "cereals_and_breakfast": [
+    "Corn Flakes", "Frosted Flakes", "Cheerios", "Honey Nut Cheerios",
+    "Granola", "Muesli", "Oatmeal", "Instant Oats", "Steel Cut Oats",
+    "Wheaties", "Rice Krispies", "Raisin Bran", "Bran Flakes",
+    "Cocoa Puffs", "Fruit Loops", "Lucky Charms", "Cap'n Crunch",
+    "Pancake Mix", "Waffle Mix", "French Toast Sticks", "Breakfast Biscuit",
+    "Protein Shake Mix", "Chia Seeds", "Flaxseeds", "Hemp Seeds",
+    "Maple Syrup", "Honey", "Jam", "Strawberry Jam", "Blueberry Jam",
+    "Peanut Butter", "Almond Butter", "Nutella", "Cream of Wheat"
+  ],
+  "beverages": [
+    "Cola", "Diet Cola", "Sprite", "Fanta Orange", "Fanta Grape",
+    "Ginger Ale", "Root Beer", "Dr Pepper", "Mountain Dew",
+    "Red Bull", "Monster Energy", "Gatorade", "Powerade", "Vitaminwater",
+    "Green Tea", "Black Tea", "Herbal Tea", "Chamomile Tea", "Peppermint Tea",
+    "Espresso", "Ground Coffee", "Instant Coffee", "Cold Brew Coffee",
+    "Cappuccino Mix", "Hot Chocolate Mix", "Beer", "Craft Beer", "Lager",
+    "White Wine", "Red Wine", "Rose Wine", "Sparkling Wine", "Champagne",
+    "Vodka", "Whiskey", "Rum", "Gin", "Tequila", "Brandy"
+  ],
+  "frozen_foods": [
+    "Frozen Pizza", "Frozen Burrito", "Frozen Lasagna", "Frozen Pasta",
+    "Frozen Chicken Nuggets", "Frozen Fish Sticks", "Frozen Shrimp",
+    "Frozen French Fries", "Frozen Onion Rings", "Frozen Mozzarella Sticks",
+    "Frozen Waffles", "Frozen Pancakes", "Frozen Burritos",
+    "Frozen Vegetables Mix", "Frozen Peas", "Frozen Corn", "Frozen Broccoli",
+    "Frozen Edamame", "Frozen Spinach", "Frozen Mango Chunks",
+    "Frozen Strawberries", "Frozen Blueberries", "Frozen Mixed Berries",
+    "Ice Cream Vanilla", "Ice Cream Chocolate", "Ice Cream Strawberry",
+    "Ice Cream Mint Chip", "Sorbet", "Gelato", "Ice Cream Sandwich",
+    "Popsicle", "Frozen Yogurt", "Frozen Dinner", "Pot Pie"
+  ],
+  "canned_goods": [
+    "Canned Tomatoes", "Tomato Paste", "Tomato Sauce", "Canned Corn",
+    "Canned Peas", "Canned Green Beans", "Canned Mushrooms", "Canned Artichokes",
+    "Canned Tuna", "Canned Salmon", "Canned Sardines", "Canned Crab",
+    "Canned Chicken", "Canned Beef", "Canned Ham",
+    "Canned Black Beans", "Canned Kidney Beans", "Canned Chickpeas",
+    "Canned Lentils", "Canned Navy Beans", "Canned Pinto Beans",
+    "Canned Peaches", "Canned Pears", "Canned Pineapple", "Canned Mandarin",
+    "Chicken Broth", "Beef Broth", "Vegetable Broth", "Coconut Milk Canned",
+    "Tomato Soup", "Chicken Noodle Soup", "Minestrone Soup", "Clam Chowder"
+  ],
+  "condiments_and_sauces": [
+    "Ketchup", "Mustard", "Mayonnaise", "Relish", "Hot Sauce",
+    "Sriracha", "Tabasco", "BBQ Sauce", "Teriyaki Sauce", "Soy Sauce",
+    "Worcestershire Sauce", "Fish Sauce", "Oyster Sauce", "Hoisin Sauce",
+    "Ranch Dressing", "Caesar Dressing", "Italian Dressing", "Balsamic Dressing",
+    "Thousand Island", "Honey Mustard", "Blue Cheese Dressing",
+    "Olive Oil", "Vegetable Oil", "Coconut Oil", "Sesame Oil", "Canola Oil",
+    "Apple Cider Vinegar", "White Vinegar", "Balsamic Vinegar",
+    "Salt", "Black Pepper", "Paprika", "Cumin", "Oregano", "Basil",
+    "Thyme", "Rosemary", "Cinnamon", "Turmeric", "Chili Powder",
+    "Garlic Powder", "Onion Powder", "Nutmeg", "Cayenne Pepper"
+  ],
+  "pasta_and_rice": [
+    "Spaghetti", "Penne", "Fusilli", "Farfalle", "Rigatoni", "Linguine",
+    "Fettuccine", "Tagliatelle", "Lasagna Sheets", "Orzo", "Macaroni",
+    "Angel Hair", "Gnocchi", "Ravioli", "Tortellini", "Cannelloni",
+    "White Rice", "Brown Rice", "Basmati Rice", "Jasmine Rice",
+    "Wild Rice", "Arborio Rice", "Black Rice", "Sushi Rice",
+    "Instant Noodles", "Ramen Noodles", "Udon Noodles", "Soba Noodles",
+    "Rice Noodles", "Glass Noodles", "Couscous", "Quinoa", "Bulgur",
+    "Polenta", "Cornmeal", "Barley", "Farro", "Lentils", "Split Peas"
+  ],
+  "personal_care": [
+    "Shampoo", "Conditioner", "Body Wash", "Soap Bar", "Hand Soap",
+    "Face Wash", "Moisturizer", "Sunscreen", "Lip Balm", "Deodorant",
+    "Toothpaste", "Toothbrush", "Dental Floss", "Mouthwash",
+    "Shaving Cream", "Razor", "Aftershave", "Body Lotion", "Hand Cream",
+    "Eye Cream", "Toner", "Serum", "Face Mask", "Exfoliator",
+    "Feminine Pads", "Tampons", "Cotton Balls", "Q-Tips", "Bandages",
+    "Pain Reliever", "Antacid", "Vitamins", "Multivitamin", "Vitamin C"
+  ],
+  "cleaning_products": [
+    "Dish Soap", "Dishwasher Detergent", "Laundry Detergent", "Fabric Softener",
+    "Bleach", "All-Purpose Cleaner", "Glass Cleaner", "Bathroom Cleaner",
+    "Toilet Bowl Cleaner", "Floor Cleaner", "Oven Cleaner", "Drain Cleaner",
+    "Sponge", "Scrub Brush", "Mop", "Broom", "Dustpan",
+    "Trash Bags", "Zip Lock Bags", "Paper Towels", "Toilet Paper",
+    "Napkins", "Aluminum Foil", "Plastic Wrap", "Parchment Paper",
+    "Rubber Gloves", "Microfiber Cloth", "Steel Wool", "Air Freshener"
+  ]
+}

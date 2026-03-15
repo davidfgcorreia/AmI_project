@@ -150,37 +150,39 @@ def path_distance(path: list[tuple[float, float]]) -> float:
     return d
 
 
-def multi_product_route(start: tuple[float, float],
-                        targets: list[tuple[float, float]]) -> list[tuple[float, float]]:
+def multi_product_route(
+    start: tuple[float, float],
+    targets: list[tuple[float, float]],
+) -> tuple[list[tuple[float, float]], list[int]]:
     """
-    Nearest-neighbour heuristic for multi-product route.
-    Returns the concatenated optimal-ish path visiting all targets.
+    Nearest-neighbour TSP heuristic for multi-product route.
+    Returns (full_path, ordered_indices) where ordered_indices is the
+    visit order of the original targets list.
     """
     if not targets:
-        return []
+        return [], []
 
-    remaining = list(targets)
+    remaining: list[tuple[int, tuple[float, float]]] = list(enumerate(targets))
+    ordered_indices: list[int] = []
     full_path: list[tuple[float, float]] = []
     current = start
 
     while remaining:
-        # Pick nearest target
-        best_idx = 0
-        best_dist = float("inf")
-        for i, t in enumerate(remaining):
-            d = math.hypot(t[0] - current[0], t[1] - current[1])
-            if d < best_dist:
-                best_dist = d
-                best_idx = i
+        # Pick nearest unvisited target
+        best_pos, (best_orig_idx, best_target) = min(
+            enumerate(remaining),
+            key=lambda x: math.hypot(x[1][1][0] - current[0], x[1][1][1] - current[1]),
+        )
+        remaining.pop(best_pos)
+        ordered_indices.append(best_orig_idx)
 
-        target = remaining.pop(best_idx)
-        logger.info("[PATH] 🛤️ Segment %d → target (%.1f, %.1f)  nearest_dist=%.2f",
-                    len(targets) - len(remaining), target[0], target[1], best_dist)
-        segment = astar(current, target)
+        logger.info("[PATH] 🛤️ Segment %d → target (%.1f, %.1f)",
+                    len(ordered_indices), best_target[0], best_target[1])
+        segment = astar(current, best_target)
         if segment:
             if full_path:
                 segment = segment[1:]  # avoid duplicate waypoint
             full_path.extend(segment)
-        current = target
+        current = best_target
 
-    return full_path
+    return full_path, ordered_indices

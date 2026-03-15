@@ -8,6 +8,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "app" / "static"
 SHELF_IMG_DIR = STATIC_DIR / "shelf_images"
+PROJECT_ROOT = BASE_DIR.parent.parent
+SUPERMARKET_JSON = PROJECT_ROOT / "supermarket.json"
 
 # ── MQTT ──
 MQTT_BROKER_HOST = os.environ.get("MQTT_BROKER_HOST", "localhost")
@@ -31,8 +33,8 @@ KALMAN_PROCESS_NOISE = 0.05
 KALMAN_MEASUREMENT_NOISE = 2.0
 
 # ── Navigation ──
-STORE_WIDTH = 4.0         # metres
-STORE_HEIGHT = 4.0        # metres
+STORE_WIDTH = 12.0        # metres  (must match FloorMap.jsx STORE_W)
+STORE_HEIGHT = 10.0       # metres  (must match FloorMap.jsx STORE_H)
 GRID_RESOLUTION = 0.25      # metres per grid cell
 
 

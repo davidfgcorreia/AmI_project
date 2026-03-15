@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from ..models.database import Product, Shelf, ShelfImage
+from ..models.database import Product, Shelf
 from ..models.schemas import NavigateRequest, NavigateResponse, NavStep, ProductOut
 from ..services.kalman_fusion import get_tracker
 from ..services.pathfinding import multi_product_route, astar, path_distance
@@ -75,33 +75,23 @@ async def navigate(body: NavigateRequest, db: AsyncSession = Depends(get_db)):
 
     logger.info("[NAV] 🎯 Targets: %s", targets)
 
-    # Compute path
-    path_coords = multi_product_route(start, targets)
+    # Compute path – multi_product_route returns (path, visit_order)
+    path_coords, ordered_indices = multi_product_route(start, targets)
     if not path_coords:
-        # Fallback: direct line
         logger.warning("[NAV] ⚠ A* returned no path – using direct line")
         path_coords = [start] + targets
+        ordered_indices = list(range(len(targets)))
 
     total_dist = path_distance(path_coords)
-    logger.info("[NAV] ✔ Path computed: %d waypoints, %.2f m total", len(path_coords), total_dist)
+    logger.info("[NAV] ✔ Path: %d waypoints, %.2f m, visit order=%s",
+                len(path_coords), total_dist, ordered_indices)
 
-    # Find shelf image for the last target product
-    shelf_image_url = None
-    last_product = products[-1]
-    if last_product.shelf_id is not None:
-        img_result = await db.execute(
-            select(ShelfImage)
-            .where(ShelfImage.shelf_id == last_product.shelf_id)
-            .order_by(ShelfImage.uploaded_at.desc())
-            .limit(1)
-        )
-        img = img_result.scalar_one_or_none()
-        if img:
-            shelf_image_url = f"/static/shelf_images/{img.filename}"
+    # Return products sorted by the optimised visit order
+    ordered_products = [products[i] for i in ordered_indices]
 
     return NavigateResponse(
         path=[NavStep(x=x, y=y) for x, y in path_coords],
         distance=round(total_dist, 2),
-        products=[ProductOut.model_validate(p) for p in products],
-        shelf_image_url=shelf_image_url,
+        products=[ProductOut.model_validate(p) for p in ordered_products],
+        shelf_image_url=None,
     )

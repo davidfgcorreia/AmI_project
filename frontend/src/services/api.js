@@ -1,7 +1,9 @@
 /**
  * API client – talks to the FastAPI backend.
  */
-const BASE = '';   // proxied by Vite in dev
+// In dev: empty (Vite proxy handles it).
+// In Android build: set VITE_BACKEND_URL=http://192.168.x.x:8000
+const BASE = import.meta.env.VITE_BACKEND_URL || '';
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -39,17 +41,6 @@ export const navigate = (sessionId, { productIds, productQuery }) =>
     }),
   });
 
-// ── Shelf scan (upload image) ──
-export const scanShelf = async (shelfId, imageFile, highlight = '') => {
-  const form = new FormData();
-  form.append('image', imageFile);
-  form.append('highlight', highlight);
-  const res = await fetch(`${BASE}/api/shelves/${shelfId}/scan`, {
-    method: 'POST',
-    body: form,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-};
 
 export const healthCheck = () => request('/health');
+
