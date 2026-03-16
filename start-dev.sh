@@ -3,7 +3,7 @@
 set -e
 
 echo "═══════════════════════════════════════════════"
-echo "  Intelligent Retail Ecosystem – Dev Launcher"
+echo "  Intelligent Retail Ecosystem - Dev Launcher"
 echo "═══════════════════════════════════════════════"
 
 # ── Detect local network IP ──

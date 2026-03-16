@@ -1,5 +1,5 @@
 """
-Intelligent Retail Ecosystem – FastAPI Backend
+Intelligent Retail Ecosystem - FastAPI Backend
 ═══════════════════════════════════════════════
 Central server handling:
   • BLE trilateration + IMU/PDR Kalman fusion
@@ -31,7 +31,7 @@ logger = logging.getLogger("ire")
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("═══════════════════════════════════════════════")
-    logger.info("  Intelligent Retail Ecosystem – starting up")
+    logger.info("  Intelligent Retail Ecosystem - starting up")
     logger.info("═══════════════════════════════════════════════")
     logger.info("Creating database tables …")
     async with engine.begin() as conn:
@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
     logger.info("Store: %.0f×%.0f m  grid=%.1fm  gateways=%s",
                 STORE_WIDTH, STORE_HEIGHT, GRID_RESOLUTION,
                 list(GATEWAY_POSITIONS.keys()))
-    logger.info("✔  Backend ready – listening on http://0.0.0.0:8000")
+    logger.info("✔  Backend ready - listening on http://0.0.0.0:8000")
     yield
 
     # Shutdown
@@ -63,11 +63,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Intelligent Retail Ecosystem",
     version="1.0.0",
-    description="AmI backend – BLE fusion, navigation, CV, real-time tracking",
+    description="AmI backend - BLE fusion, navigation, CV, real-time tracking",
     lifespan=lifespan,
 )
 
-# CORS – allow PWA on any port during development
+# CORS - allow PWA on any port during development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -114,7 +114,7 @@ async def _seed_demo_data():
 
         # ── Load product catalogue ──
         if not SUPERMARKET_JSON.exists():
-            logger.warning("supermarket.json not found at %s – skipping seed", SUPERMARKET_JSON)
+            logger.warning("supermarket.json not found at %s - skipping seed", SUPERMARKET_JSON)
             return
 
         with open(SUPERMARKET_JSON, "r", encoding="utf-8") as f:

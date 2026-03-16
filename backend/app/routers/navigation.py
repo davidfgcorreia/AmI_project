@@ -1,5 +1,5 @@
 """
-Navigation REST endpoint – takes a user position + product list,
+Navigation REST endpoint - takes a user position + product list,
 returns an optimised A* path.
 """
 import logging
@@ -75,10 +75,10 @@ async def navigate(body: NavigateRequest, db: AsyncSession = Depends(get_db)):
 
     logger.info("[NAV] 🎯 Targets: %s", targets)
 
-    # Compute path – multi_product_route returns (path, visit_order)
+    # Compute path - multi_product_route returns (path, visit_order)
     path_coords, ordered_indices = multi_product_route(start, targets)
     if not path_coords:
-        logger.warning("[NAV] ⚠ A* returned no path – using direct line")
+        logger.warning("[NAV] ⚠ A* returned no path - using direct line")
         path_coords = [start] + targets
         ordered_indices = list(range(len(targets)))
 

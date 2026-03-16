@@ -1,5 +1,5 @@
 """
-Core configuration – environment variables and constants.
+Core configuration - environment variables and constants.
 """
 import os
 from pathlib import Path
@@ -25,8 +25,8 @@ GATEWAY_POSITIONS = {
 }
 
 # ── Trilateration tuning ──
-BLE_TX_POWER = -59          # RSSI at 1 m (dBm) – calibrate per beacon
-BLE_PATH_LOSS_EXP = 2.7    # n – indoor path-loss exponent
+BLE_TX_POWER = -59          # RSSI at 1 m (dBm) - calibrate per beacon
+BLE_PATH_LOSS_EXP = 2.7    # n - indoor path-loss exponent
 
 # ── Kalman filter process / measurement noise ──
 KALMAN_PROCESS_NOISE = 0.05

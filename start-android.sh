@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# start-android.sh – starts the backend and builds the Android app.
+# start-android.sh - starts the backend and builds the Android app.
 #
 # Usage:
 #   ./start-android.sh                 # auto-detects LAN IP
@@ -29,7 +29,7 @@ BACKEND_URL="http://${BACKEND_IP}:8000"
 
 echo ""
 echo "═══════════════════════════════════════════════"
-echo "  Store Navigator – Android Dev Launcher"
+echo "  Store Navigator - Android Dev Launcher"
 echo "═══════════════════════════════════════════════"
 echo "  Backend URL : $BACKEND_URL"
 echo ""

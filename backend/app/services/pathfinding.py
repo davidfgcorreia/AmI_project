@@ -17,7 +17,7 @@ COLS = int(STORE_WIDTH / GRID_RESOLUTION)
 ROWS = int(STORE_HEIGHT / GRID_RESOLUTION)
 
 # Obstacle grid: 0 = walkable, 1 = blocked (shelves / walls)
-# Initialised as fully walkable – shelves are registered dynamically
+# Initialised as fully walkable - shelves are registered dynamically
 _obstacle_grid: list[list[int]] = [[0] * COLS for _ in range(ROWS)]
 
 
@@ -132,7 +132,7 @@ def _simplify(path: list[tuple[float, float]],
 
 
 def _point_line_dist(p, a, b):
-    """Perpendicular distance from point p to line a–b."""
+    """Perpendicular distance from point p to line a-b."""
     dx, dy = b[0] - a[0], b[1] - a[1]
     if dx == 0 and dy == 0:
         return math.hypot(p[0] - a[0], p[1] - a[1])

@@ -1,8 +1,16 @@
 /*
- * ESP32 BLE Gateway – Intelligent Retail Ecosystem
+ * ESP32 BLE Gateway - Intelligent Retail Ecosystem
  * ─────────────────────────────────────────────────
- * Scans for BLE devices, extracts RSSI,
- * and publishes to MQTT broker.
+ * Scans for BLE devices advertising the IRE service UUID,
+ * extracts RSSI, and publishes to MQTT broker.
+ *
+ * The Android app continuously advertises with:
+ *   - Service UUID: 6e400001-b5a3-f393-e0a9-e50e24dcca9e
+ *   - Device name:  session_id (e.g. "IRE-a3b4c5d6")
+ *
+ * Session ID priority:
+ *   1. BLE advertisement name  (set by the Android app)
+ *   2. BLE MAC address         (fallback)
  *
  * Requirements:
  *   - ESP32 board package in Arduino IDE
@@ -20,11 +28,14 @@
 // ── CONFIGURATION ───────────────────────────────────
 #define GATEWAY_ID   "esp32_A"          // Unique per gateway (esp32_A / B / C)
 #define WIFI_SSID    "TP-Link_9772"     // WiFi SSID
-#define WIFI_PASS    "99326685"       // WiFi password
-#define MQTT_HOST    "192.168.0.102"     // Backend server IP
+#define WIFI_PASS    "99326685"         // WiFi password
+#define MQTT_HOST    "192.168.0.102"    // Backend server IP
 #define MQTT_PORT    1883
 #define MQTT_TOPIC   "ire/ble/rssi"
 #define SCAN_TIME    2                  // BLE scan duration (seconds)
+
+// IRE app service UUID – only report devices advertising this UUID
+#define IRE_SERVICE_UUID "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 
 WiFiClient   wifiClient;
 PubSubClient mqtt(wifiClient);
@@ -58,7 +69,16 @@ void reconnect_mqtt() {
 // ── BLE callback ────────────────────────────────────
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice device) override {
+    // Only process IRE app devices (filter by service UUID)
+    if (!device.haveServiceUUID() ||
+        !device.isAdvertisingService(BLEUUID(IRE_SERVICE_UUID))) {
+      return;
+    }
+
     int rssi = device.getRSSI();
+
+    // Use the advertised device name as session_id (set by the Android app).
+    // Fall back to MAC address if the name is not present.
     String name = device.getName().c_str();
     String sessionId = (name.length() > 0) ? name : device.getAddress().toString().c_str();
 

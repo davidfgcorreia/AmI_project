@@ -1,5 +1,5 @@
 /**
- * ProductList – search results with "Add to queue" buttons.
+ * ProductList - search results with "Add to queue" buttons.
  */
 import React from 'react';
 

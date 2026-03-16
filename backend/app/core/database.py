@@ -1,5 +1,5 @@
 """
-Database session factory – shared dependency, avoids circular imports.
+Database session factory - shared dependency, avoids circular imports.
 """
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
@@ -10,6 +10,6 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def get_db():
-    """FastAPI dependency – yields an async DB session."""
+    """FastAPI dependency - yields an async DB session."""
     async with SessionLocal() as session:
         yield session

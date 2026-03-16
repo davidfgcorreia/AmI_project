@@ -1,10 +1,10 @@
 /**
- * App – Intelligent Retail Ecosystem
+ * App - Intelligent Retail Ecosystem
  * ════════════════════════════════════
  * Tabs:
- *   🗺 Map    – floor map + next stop card
- *   🛒 Queue  – full shopping list
- *   🔍 Search – product search (text + voice)
+ *   🗺 Map    - floor map + next stop card
+ *   🛒 Queue  - full shopping list
+ *   🔍 Search - product search (text + voice)
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import FloorMap from './components/FloorMap';
@@ -14,15 +14,12 @@ import NavQueue from './components/NavQueue';
 import StatusBar from './components/StatusBar';
 import { getProducts, getShelves, getGateways, navigate as apiNavigate } from './services/api';
 import { connectTracking, disconnectTracking, isConnected, connectGateways, disconnectGateways } from './services/websocket';
+import { getOrCreateSessionId, startBleAdvertising, stopBleAdvertising } from './services/ble';
 import useIMU from './hooks/useIMU';
-
-function generateSessionId() {
-  return 'A32 de David';
-}
 
 export default function App() {
   const [tab, setTab] = useState('map');
-  const [sessionId] = useState(() => generateSessionId());
+  const [sessionId, setSessionId] = useState(null);
   const [userPos, setUserPos] = useState(null);
   const [shelves, setShelves] = useState([]);
   const [beacons, setBeacons] = useState([]);
@@ -37,8 +34,25 @@ export default function App() {
 
   useIMU(tab === 'map');
 
-  // ── Startup ──
+  // ── Step 1: Resolve session ID and start BLE advertising ──
+  // getOrCreateSessionId() tries the native plugin first, then localStorage.
+  // startBleAdvertising() makes the device continuously visible to ESP32 gateways.
   useEffect(() => {
+    let cancelled = false;
+    getOrCreateSessionId().then(sid => {
+      if (cancelled) return;
+      setSessionId(sid);
+      startBleAdvertising(sid);
+    });
+    return () => {
+      cancelled = true;
+      stopBleAdvertising();
+    };
+  }, []);
+
+  // ── Step 2: Connect WebSocket and load static data once session ID is ready ──
+  useEffect(() => {
+    if (!sessionId) return;
     getShelves().then(setShelves).catch(console.error);
     getGateways().then(setBeacons).catch(console.error);
     connectTracking(sessionId, setUserPos);
@@ -53,6 +67,7 @@ export default function App() {
 
   // ── Re-route when the SET of pending items changes ──
   useEffect(() => {
+    if (!sessionId) return;
     const pending = queue.filter(p => !p.collected);
     const pendingKey = pending.map(p => p.id).sort().join(',');
 

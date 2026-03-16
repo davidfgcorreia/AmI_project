@@ -13,6 +13,7 @@ from ..services.ble_trilateration import trilaterate
 from ..services.kalman_fusion import get_tracker, remove_tracker
 from ..services.mqtt_client import get_ble_buffer
 from ..services.csv_logger import get_csv_logger, close_csv_logger
+from ..services import session_manager
 from ..models.schemas import BLEReading
 
 router = APIRouter()
@@ -50,9 +51,10 @@ async def tracking_ws(ws: WebSocket, session_id: str):
     """
     await ws.accept()
     _connections[session_id] = ws
+    session_manager.create_or_update(session_id)
     tracker = get_tracker(session_id)
     csv_log = get_csv_logger(session_id)
-    logger.info("[WS] ✔ Connected: session=%s  (active sessions: %d)", session_id, len(_connections))
+    logger.info("[WS] Connected: session=%s  (active sessions: %d)", session_id, len(_connections))
 
     msg_count = 0
     try:
@@ -61,7 +63,7 @@ async def tracking_ws(ws: WebSocket, session_id: str):
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
-                logger.warning("[WS] ⚠ Bad JSON from %s: %s", session_id, raw[:80])
+                logger.warning("[WS] Bad JSON from %s: %s", session_id, raw[:80])
                 continue
 
             msg_count += 1
@@ -73,22 +75,22 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 tracker.predict_pdr(heading, steps, dt=0.2)
                 csv_log.record_imu(heading, steps)
                 if steps > 0:
-                    logger.info("[WS] 📱 IMU  session=%s  heading=%.1f°  steps=%d", session_id, heading, steps)
+                    logger.info("[WS] IMU  session=%s  heading=%.1f  steps=%d", session_id, heading, steps)
 
             # Also check the BLE buffer (populated by MQTT listener or HTTP)
             ble_readings = get_ble_buffer().get(session_id)
             if ble_readings and len(ble_readings) >= 3:
                 rssi_str = "  ".join(f"{gw}={rssi:+.0f}dBm" for gw, rssi in ble_readings.items())
-                logger.info("[WS] 📡 BLE  session=%s  %s", session_id, rssi_str)
+                logger.info("[WS] BLE  session=%s  %s", session_id, rssi_str)
                 csv_log.record_ble(ble_readings)
 
                 ble_pos = trilaterate(ble_readings)
                 if ble_pos:
-                    logger.info("[WS] 📐 Trilateration → (%.2f, %.2f)", ble_pos[0], ble_pos[1])
+                    logger.info("[WS] Trilateration -> (%.2f, %.2f)", ble_pos[0], ble_pos[1])
                     csv_log.record_trilateration(ble_pos[0], ble_pos[1])
                     tracker.update_ble(*ble_pos)
                 else:
-                    logger.warning("[WS] ⚠ Trilateration failed for session=%s", session_id)
+                    logger.warning("[WS] Trilateration failed for session=%s", session_id)
                     csv_log.record_trilateration(None, None)
 
             # Send fused position back
@@ -104,24 +106,30 @@ async def tracking_ws(ws: WebSocket, session_id: str):
 
             # Log fused position every 5 messages to avoid spam
             if msg_count % 5 == 0:
-                logger.info("[WS] 📍 Fused position  session=%s  (%.2f, %.2f) ±%.2fm  [msg #%d]",
+                logger.info("[WS] Fused position  session=%s  (%.2f, %.2f) +/-%.2fm  [msg #%d]",
                             session_id, x, y, accuracy, msg_count)
 
     except WebSocketDisconnect:
-        logger.info("[WS] ✖ Disconnected: session=%s  (processed %d messages)", session_id, msg_count)
+        logger.info("[WS] Disconnected: session=%s  (processed %d messages)", session_id, msg_count)
     except Exception as exc:
-        logger.error("[WS] ✖ Error session=%s: %s", session_id, exc)
+        logger.error("[WS] Error session=%s: %s", session_id, exc)
     finally:
         _connections.pop(session_id, None)
         close_csv_logger(session_id, instance=csv_log)
         remove_tracker(session_id)
 
 
-# ── REST endpoint for BLE readings (used by simulator / ESP32 HTTP fallback) ──
+# ── REST endpoints ─────────────────────────────────────────────────────────────
+
+@router.get("/api/sessions")
+async def get_sessions():
+    """Return all sessions discovered via BLE (MQTT) or WebSocket connection."""
+    return session_manager.get_all()
+
 
 @router.get("/api/ble/buffer")
 async def get_ble_buffer_debug():
-    """Debug endpoint – shows current BLE buffer state."""
+    """Debug endpoint - shows current BLE buffer state."""
     return get_ble_buffer()
 
 
@@ -137,8 +145,9 @@ async def post_ble_reading(reading: BLEReading):
     is_new = reading.session_id not in buf
     if is_new:
         buf[reading.session_id] = {}
-        logger.info("[BLE] 🆕 New session detected: %s", reading.session_id)
+        logger.info("[BLE] New session detected: %s", reading.session_id)
     buf[reading.session_id][reading.gateway_id] = reading.rssi
-    logger.info("[BLE] 📡 Reading  gw=%s  session=%s  rssi=%+.1f dBm",
+    session_manager.create_or_update(reading.session_id)
+    logger.info("[BLE] Reading  gw=%s  session=%s  rssi=%+.1f dBm",
                 reading.gateway_id, reading.session_id, reading.rssi)
     return {"status": "ok"}

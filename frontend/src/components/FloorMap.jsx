@@ -1,5 +1,5 @@
 /**
- * FloorMap – renders a 2D floor plan on a <canvas> showing:
+ * FloorMap - renders a 2D floor plan on a <canvas> showing:
  *   • Store outline & grid
  *   • Shelves (rectangles)
  *   • User position (blue dot)

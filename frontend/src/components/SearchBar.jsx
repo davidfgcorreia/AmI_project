@@ -1,5 +1,5 @@
 /**
- * SearchBar – text + voice search for products.
+ * SearchBar - text + voice search for products.
  */
 import React, { useState, useCallback } from 'react';
 import useVoiceSearch from '../hooks/useVoiceSearch';

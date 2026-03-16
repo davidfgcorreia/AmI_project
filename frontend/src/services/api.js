@@ -1,5 +1,5 @@
 /**
- * API client – talks to the FastAPI backend.
+ * API client - talks to the FastAPI backend.
  */
 // In dev: empty (Vite proxy handles it).
 // In Android build: set VITE_BACKEND_URL=http://192.168.x.x:8000

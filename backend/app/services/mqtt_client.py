@@ -1,5 +1,5 @@
 """
-MQTT listener – subscribes to ESP32 BLE RSSI data and feeds the
+MQTT listener - subscribes to ESP32 BLE RSSI data and feeds the
 localisation pipeline.
 
 This implementation prefers the system `mosquitto_sub` client (reads
@@ -26,15 +26,16 @@ async def mqtt_listener():
     """Background task that listens to MQTT for BLE RSSI messages.
 
     Expected JSON payload on topic `MQTT_TOPIC_BLE`:
-    { "gateway_id": "esp32_A", "session_id": "phone-uuid", "rssi": -67 }
+    { "gateway_id": "esp32_A", "session_id": "IRE-xxxxxxxx", "rssi": -67 }
+
+    Sessions are created dynamically – no hardcoded filter.
+    The ESP32 gateway uses the BLE advertisement name as session_id,
+    which the Android app sets to the stable device ID (e.g. "IRE-a3b4c5d6").
     """
     from ..core.config import MQTT_BROKER_HOST, MQTT_BROKER_PORT, MQTT_TOPIC_BLE
+    from ..services import session_manager
 
     mosquitto_sub = shutil.which("mosquitto_sub")
-
-    # Hard-coded session filter (only process messages for this session id)
-    allowed_session = 'A32 de David'
-    logger.info("MQTT session filter active: %s", allowed_session)
 
     if mosquitto_sub:
         cmd = [mosquitto_sub, "-h", MQTT_BROKER_HOST, "-p", str(MQTT_BROKER_PORT), "-t", MQTT_TOPIC_BLE]
@@ -76,16 +77,14 @@ async def mqtt_listener():
                         logger.debug("Bad MQTT payload from mosquitto_sub: %s", payload)
                         continue
 
-                    # Session filtering
-                    if allowed_session and sid != allowed_session:
-                        logger.debug("Ignoring session %s (filter=%s)", sid, allowed_session)
-                        continue
-
-                    if sid not in _ble_buffer:
+                    # Create session on first sight, update last_seen on subsequent readings
+                    is_new = sid not in _ble_buffer
+                    if is_new:
                         _ble_buffer[sid] = {}
-                        logger.info("[MQTT] 🆕 New session via mosquitto_sub: %s", sid)
+                        logger.info("[MQTT] New session discovered: %s", sid)
                     _ble_buffer[sid][gw] = rssi
-                    logger.info("[MQTT] 📡 gw=%s  session=%s  rssi=%+.1f dBm", gw, sid, rssi)
+                    session_manager.create_or_update(sid)
+                    logger.info("[MQTT] gw=%s  session=%s  rssi=%+.1f dBm", gw, sid, rssi)
 
                 # Process exited — capture stderr if available
                 if proc.stderr is not None:

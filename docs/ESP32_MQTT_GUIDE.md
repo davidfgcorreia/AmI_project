@@ -1,4 +1,4 @@
-# ESP32 BLE Gateway – MQTT Integration Guide
+# ESP32 BLE Gateway - MQTT Integration Guide
 
 > **Status: TO BE IMPLEMENTED**
 > This document describes how the ESP32 gateways will connect to the backend via MQTT to enable real-time indoor positioning. It serves as the implementation plan for the physical hardware deployment phase.
@@ -139,7 +139,7 @@ After flashing and powering on, the ESP32 Serial Monitor should show:
 Connecting to WiFi... connected!
 192.168.1.42                          ← ESP32's own IP
 MQTT connecting… connected!           ← Successfully reached your desktop
-Scan complete – 2 devices found
+Scan complete - 2 devices found
 Published: {"gateway_id":"esp32_A","session_id":"phone-123","rssi":-68}
 ```
 
@@ -159,7 +159,7 @@ ire/ble/rssi {"gateway_id":"esp32_A","session_id":"phone-123","rssi":-68}
 
 - **Static IP recommended**: If your desktop's IP changes (DHCP), the ESP32s will lose connection. Either assign a static IP to your desktop or use mDNS (`.local` hostnames).
 - **Same subnet**: The ESP32s and desktop must be on the same subnet (e.g. both on `192.168.1.x`). Guest networks or AP isolation will block the connection.
-- **Latency**: WiFi MQTT communication adds ~1–5 ms latency, which is negligible for our use case (human walking speed).
+- **Latency**: WiFi MQTT communication adds ~1-5 ms latency, which is negligible for our use case (human walking speed).
 
 ---
 
@@ -298,10 +298,10 @@ sudo systemctl restart mosquitto
 ### Verify
 
 ```bash
-# Terminal 1 – subscribe
+# Terminal 1 - subscribe
 mosquitto_sub -t "ire/ble/rssi" -v
 
-# Terminal 2 – publish a test message
+# Terminal 2 - publish a test message
 mosquitto_pub -t "ire/ble/rssi" -m '{"gateway_id":"esp32_A","session_id":"test-phone","rssi":-65}'
 ```
 
@@ -326,7 +326,7 @@ MQTT_BROKER_HOST = "localhost"    # Change if broker is on another machine
 MQTT_BROKER_PORT = 1883
 MQTT_TOPIC_BLE   = "ire/ble/rssi"
 
-# Gateway positions (x, y) in metres – MUST match GATEWAY_ID values
+# Gateway positions (x, y) in metres - MUST match GATEWAY_ID values
 GATEWAY_POSITIONS = {
     "esp32_A": (0.0, 0.0),
     "esp32_B": (10.0, 0.0),
@@ -422,9 +422,9 @@ The accuracy of positioning depends on two parameters in `config.py`:
 5. Fit the model: `RSSI = TX_POWER - 10 * n * log10(distance)` → solve for `n`.
 
 Typical values:
-- **Open space:** n ≈ 2.0–2.5
-- **Indoor with shelves:** n ≈ 2.5–3.5
-- **Heavy obstacles:** n ≈ 3.5–4.5
+- **Open space:** n ≈ 2.0-2.5
+- **Indoor with shelves:** n ≈ 2.5-3.5
+- **Heavy obstacles:** n ≈ 3.5-4.5
 
 ---
 
@@ -440,7 +440,7 @@ sudo systemctl start mosquitto
 cd backend && source venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# In another terminal – run the simulator in MQTT mode
+# In another terminal - run the simulator in MQTT mode
 cd /path/to/AmI_project
 source backend/venv/bin/activate
 python simulator/simulator.py --mqtt --speed 0.5
@@ -474,10 +474,10 @@ ire/ble/rssi {"gateway_id": "esp32_C", "session_id": "sim-1234", "rssi": -65}
 |---------|-------|-----|
 | Backend log: `MQTT connection lost ([Errno 111] Connection refused)` | Mosquitto broker not running | `sudo systemctl start mosquitto` |
 | ESP32 Serial: `MQTT connecting… failed (rc=-2)` | Wrong `MQTT_HOST` IP or broker not reachable | Check IP, ensure port 1883 is open |
-| ESP32 Serial: `Scan complete – 0 devices found` | Phone not advertising BLE, or wrong UUID | Verify phone BLE is on; check `TARGET_SERVICE_UUID` matches |
+| ESP32 Serial: `Scan complete - 0 devices found` | Phone not advertising BLE, or wrong UUID | Verify phone BLE is on; check `TARGET_SERVICE_UUID` matches |
 | Trilateration returns `None` | Fewer than 3 gateways reporting for the session | Ensure all 3 ESP32s are running and the `session_id` is consistent |
 | Position accuracy > 3 m | Poor calibration or gateway placement | Re-calibrate `BLE_TX_POWER` and `BLE_PATH_LOSS_EXP`; improve gateway geometry |
-| CSV log missing RSSI columns | MQTT messages arriving after IMU processed | This is normal for the first 1–2 steps; RSSI appears once buffer fills |
+| CSV log missing RSSI columns | MQTT messages arriving after IMU processed | This is normal for the first 1-2 steps; RSSI appears once buffer fills |
 
 ### Useful Commands
 

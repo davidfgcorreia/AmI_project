@@ -1,5 +1,5 @@
 /**
- * NavQueue – shopping queue shown below the map.
+ * NavQueue - shopping queue shown below the map.
  * Items are sorted by shortest route from the device's position.
  * Any item can be marked as collected at any time.
  */
@@ -27,7 +27,7 @@ export default function NavQueue({ queue, onCollected, onRemove, onClear }) {
         </button>
       </div>
 
-      {/* Pending items – in optimal route order */}
+      {/* Pending items - in optimal route order */}
       {pending.length > 0 && (
         <div className="nav-queue-list">
           {pending.map((item, idx) => (

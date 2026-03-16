@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
 ═══════════════════════════════════════════════════════════════
-  ESP32 + Phone Simulator – Intelligent Retail Ecosystem
+  ESP32 + Phone Simulator - Intelligent Retail Ecosystem
 ═══════════════════════════════════════════════════════════════
 
 Simulates a user walking through the store while 3 ESP32 gateways
 pick up BLE RSSI signals from the phone.
 
 Two modes of operation:
-  1. MQTT mode  – publishes RSSI to the MQTT broker (like real ESP32s)
-  2. HTTP mode  – posts BLE readings directly to the backend REST API
+  1. MQTT mode  - publishes RSSI to the MQTT broker (like real ESP32s)
+  2. HTTP mode  - posts BLE readings directly to the backend REST API
                   + sends IMU data via WebSocket (like the phone)
 
 The user follows a configurable path with realistic:
@@ -208,7 +208,7 @@ async def run_http_mode(session_id: str, path: list[tuple[float, float]],
         ws = await websockets.connect(ws_url)
         print(f'  ✔ WebSocket connected: {ws_url}')
     except Exception as e:
-        print(f'  ⚠ WebSocket failed ({e}) – will use HTTP only')
+        print(f'  ⚠ WebSocket failed ({e}) - will use HTTP only')
 
     async with httpx.AsyncClient(base_url=backend_url, timeout=5) as client:
         print(f'\n  Simulating {len(steps)} steps … (Ctrl+C to stop)\n')
@@ -253,7 +253,7 @@ async def run_http_mode(session_id: str, path: list[tuple[float, float]],
     if ws:
         await ws.close()
 
-    print(f'\n  ✔ Simulation complete – {state.total_steps} steps taken')
+    print(f'\n  ✔ Simulation complete - {state.total_steps} steps taken')
 
 
 # ── MQTT mode ──────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
         ws = await websockets.connect(ws_url)
         print(f'  ✔ WebSocket connected: {ws_url}')
     except Exception as e:
-        print(f'  ⚠ WebSocket failed ({e}) – MQTT-only, no fused position feedback')
+        print(f'  ⚠ WebSocket failed ({e}) - MQTT-only, no fused position feedback')
 
     async with aiomqtt.Client(hostname=broker_host, port=broker_port) as mqtt:
         print(f'  ✔ MQTT connected: {broker_host}:{broker_port}')
@@ -329,7 +329,7 @@ async def run_mqtt_mode(session_id: str, path: list[tuple[float, float]],
     if ws:
         await ws.close()
 
-    print(f'\n  ✔ Simulation complete – {state.total_steps} steps')
+    print(f'\n  ✔ Simulation complete - {state.total_steps} steps')
 
 
 # ── BLE reading REST endpoint (add to backend if missing) ─────────────
@@ -397,7 +397,7 @@ examples:
         active_gateways = None  # all gateways
 
     print('═' * 54)
-    print('  Intelligent Retail Ecosystem – Simulator')
+    print('  Intelligent Retail Ecosystem - Simulator')
     print('═' * 54)
     print(f'  Mode:       {"MQTT" if args.mqtt else "HTTP"}')
     print(f'  Session ID: {args.session}')
