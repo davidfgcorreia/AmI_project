@@ -10,6 +10,7 @@ import numpy as np
 from scipy.optimize import least_squares
 from ..core.config import (
     GATEWAY_POSITIONS, BLE_TX_POWER, BLE_PATH_LOSS_EXP,
+    BLE_NEAR_RSSI, BLE_NEAR_DIST_AT_REF, BLE_FAR_DBM_PER_M,
 )
 
 logger = logging.getLogger("ble")
@@ -17,10 +18,22 @@ logger = logging.getLogger("ble")
 
 def rssi_to_distance(rssi: float, tx_power: float = BLE_TX_POWER,
                      n: float = BLE_PATH_LOSS_EXP) -> float:
-    """Log-distance path-loss model: d = 10^((TxPower - RSSI) / (10·n))"""
+    """
+    Two-segment model calibrated from measurements:
+      Near field (RSSI > -70, i.e. < 1 m):
+        Linear interpolation — -50 dBm → 0.5 m, -70 dBm → 1.0 m
+      Far field  (RSSI ≤ -70, i.e. ≥ 1 m):
+        Linear — d = 1 + (tx_power - rssi) / BLE_FAR_DBM_PER_M
+        Matches measured: -75→2 m, -80→3 m, -85→4 m, -90→5 m
+    """
     if rssi >= 0:
         return 0.1  # clamp invalid readings
-    return 10 ** ((tx_power - rssi) / (10 * n))
+    if rssi > BLE_NEAR_RSSI:
+        # near-field linear: maps [-50, -70] dBm → [0.5, 1.0] m
+        slope = (BLE_NEAR_DIST_AT_REF - 1.0) / (-50 - BLE_NEAR_RSSI)  # m/dBm
+        return max(0.1, 1.0 + (rssi - BLE_NEAR_RSSI) * slope)
+    # far-field linear: d = 1 + (tx_power - rssi) / 5
+    return 1.0 + (tx_power - rssi) / BLE_FAR_DBM_PER_M
 
 
 def _residuals(point: np.ndarray,

@@ -165,49 +165,13 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     if (!canvas) return;
 
     function resize() {
-      // Fit the full store into the parent container while preserving aspect ratio
-      const parent = canvas.parentElement || canvas;
-      const pRect = parent.getBoundingClientRect();
-      const storeRatio = STORE_W / STORE_H;
-
-      // Candidate sizes: fit width, compute height; if too tall, fit height instead
-      let cssWidth = pRect.width;
-      let cssHeight = cssWidth / storeRatio;
-      if (cssHeight > pRect.height) {
-        cssHeight = pRect.height;
-        cssWidth = cssHeight * storeRatio;
-      }
-
-      // Decide whether to actually resize to avoid frequent small resizes.
-      const newCssWidth = Math.round(cssWidth);
-      const newCssHeight = Math.round(cssHeight);
-      const curr = rectRef.current || { width: 0, height: 0 };
-      const allowIncreaseFactor = 1.25; // require a larger jump to increase size
-
-      const becameSmaller = newCssWidth < curr.width - 1 || newCssHeight < curr.height - 1;
-      const becameMuchLarger = newCssWidth > Math.round(curr.width * allowIncreaseFactor) || newCssHeight > Math.round(curr.height * allowIncreaseFactor);
-
-      // Always initialize once
-      if (!canvas.dataset.fm_inited) {
-        canvas.dataset.fm_inited = '1';
-      } else if (!becameSmaller && !becameMuchLarger) {
-        // skip small changes to avoid heavy reflow/resize
-        return;
-      }
-
-      // Apply CSS size so the canvas element occupies the calculated area
-      canvas.style.width = `${newCssWidth}px`;
-      canvas.style.height = `${newCssHeight}px`;
-
-      // HiDPI backing store size
       const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.round(rect.width * dpr);
       canvas.height = Math.round(rect.height * dpr);
       const ctx = canvas.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // reset & scale for DPR
-
-      // store CSS pixel size for draw calculations
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       rectRef.current = { width: rect.width, height: rect.height };
     }
 
@@ -228,7 +192,7 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
 
   return (
     <div className="map-container">
-      <canvas ref={canvasRef} />
+      <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
     </div>
   );
 }
