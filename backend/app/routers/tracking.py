@@ -86,7 +86,8 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 if ble_pos:
                     logger.info("[WS] 📐 Trilateration → (%.2f, %.2f)", ble_pos[0], ble_pos[1])
                     csv_log.record_trilateration(ble_pos[0], ble_pos[1])
-                    tracker.update_ble(*ble_pos)
+                    best_rssi = max(ble_readings.values())
+                    tracker.update_ble(*ble_pos, best_rssi=best_rssi)
                 else:
                     logger.warning("[WS] ⚠ Trilateration failed for session=%s", session_id)
                     csv_log.record_trilateration(None, None)
@@ -150,7 +151,8 @@ async def post_ble_reading(reading: BLEReading):
             ble_pos = trilaterate(ble_readings)
             if ble_pos:
                 tracker = get_tracker(reading.session_id)
-                tracker.update_ble(*ble_pos)
+                best_rssi = max(ble_readings.values())
+                tracker.update_ble(*ble_pos, best_rssi=best_rssi)
                 x, y = tracker.position
                 try:
                     await ws.send_json({

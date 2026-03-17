@@ -9,7 +9,7 @@ State vector: [x, y, vx, vy]
 import math
 import logging
 import numpy as np
-from ..core.config import KALMAN_PROCESS_NOISE, KALMAN_MEASUREMENT_NOISE
+from ..core.config import KALMAN_PROCESS_NOISE, KALMAN_MEASUREMENT_NOISE, BLE_TX_POWER
 
 logger = logging.getLogger("kalman")
 
@@ -71,8 +71,15 @@ class KalmanTracker:
         logger.debug("[KALMAN] PDR predict  heading=%.1f°  steps=%d  dx=%.2f dy=%.2f → (%.2f, %.2f)",
                      heading_deg, steps, dx, dy, self.x[0], self.x[1])
 
-    def update_ble(self, ble_x: float, ble_y: float):
-        """Correction step using BLE trilateration measurement."""
+    def update_ble(self, ble_x: float, ble_y: float, best_rssi: float | None = None):
+        """
+        Correction step using BLE trilateration measurement.
+
+        best_rssi: strongest (least negative) RSSI seen in this scan.
+            Used to scale measurement noise — a strong reading means we're
+            definitely close to an ESP so BLE is reliable; a weak reading
+            means we may be far or obstructed so we trust BLE less.
+        """
         if not self._initialised:
             self.x[0] = ble_x
             self.x[1] = ble_y
@@ -80,16 +87,27 @@ class KalmanTracker:
             logger.info("[KALMAN] 🆕 Initialised at (%.2f, %.2f)", ble_x, ble_y)
             return
 
+        # Dynamic R: scales with signal strength.
+        # At best_rssi == BLE_TX_POWER (-70 dBm, i.e. 1 m) → r = base noise.
+        # At best_rssi == -45 dBm (very close) → r ≈ 0.18 × base (trust BLE a lot).
+        # At best_rssi == -90 dBm (far / blocked) → r ≈ 3.2 × base (trust BLE less).
+        if best_rssi is not None:
+            r = KALMAN_MEASUREMENT_NOISE * 10 ** ((BLE_TX_POWER - best_rssi) / 20)
+            r = max(0.15, min(4.0, r))
+        else:
+            r = KALMAN_MEASUREMENT_NOISE
+        R = np.diag([r, r])
+
         z = np.array([ble_x, ble_y])
-        y = z - self.H @ self.x                   # innovation
-        S = self.H @ self.P @ self.H.T + self.R   # innovation covariance
+        y = z - self.H @ self.x                 # innovation
+        S = self.H @ self.P @ self.H.T + R      # innovation covariance
         K = self.P @ self.H.T @ np.linalg.inv(S)  # Kalman gain
 
         self.x = self.x + K @ y
         I = np.eye(4)
         self.P = (I - K @ self.H) @ self.P
-        logger.info("[KALMAN] BLE update  meas=(%.2f, %.2f)  innov=(%.2f, %.2f) → fused=(%.2f, %.2f)  acc=%.2fm",
-                    ble_x, ble_y, float(y[0]), float(y[1]), self.x[0], self.x[1], self.accuracy)
+        logger.info("[KALMAN] BLE update  meas=(%.2f, %.2f)  innov=(%.2f, %.2f) → fused=(%.2f, %.2f)  r=%.2f  acc=%.2fm",
+                    ble_x, ble_y, float(y[0]), float(y[1]), self.x[0], self.x[1], r, self.accuracy)
 
     @property
     def position(self) -> tuple[float, float]:

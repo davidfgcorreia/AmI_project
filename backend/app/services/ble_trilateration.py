@@ -38,13 +38,14 @@ def rssi_to_distance(rssi: float, tx_power: float = BLE_TX_POWER,
 
 def _residuals(point: np.ndarray,
                gateways: list[tuple[float, float]],
-               distances: list[float]) -> np.ndarray:
-    """Residual function for least-squares optimisation."""
+               distances: list[float],
+               weights: list[float]) -> np.ndarray:
+    """Weighted residual function: strong-signal readings dominate the fit."""
     x, y = point
     res = []
-    for (gx, gy), d in zip(gateways, distances):
+    for (gx, gy), d, w in zip(gateways, distances, weights):
         estimated = math.sqrt((x - gx) ** 2 + (y - gy) ** 2)
-        res.append(estimated - d)
+        res.append(w * (estimated - d))
     return np.array(res)
 
 
@@ -63,6 +64,7 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
     """
     gateways: list[tuple[float, float]] = []
     distances: list[float] = []
+    weights: list[float] = []
 
     for gw_id, rssi in readings.items():
         pos = GATEWAY_POSITIONS.get(gw_id)
@@ -70,6 +72,10 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
             continue
         gateways.append(pos)
         distances.append(rssi_to_distance(rssi))
+        # Weight = amplitude ratio relative to 1 m reference.
+        # Strong signal (-45) → w≈18,  reference (-70) → w=1,  weak (-90) → w=0.1
+        # Signal can only be attenuated, so a high reading is a reliable "close" indicator.
+        weights.append(max(0.05, 10 ** ((rssi - BLE_TX_POWER) / 20)))
 
     if len(gateways) < 3:
         logger.warning("[BLE-TRI] ⚠ Only %d known gateways (need ≥3) – skip", len(gateways))
@@ -79,13 +85,13 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
     x0 = np.mean([g[0] for g in gateways])
     y0 = np.mean([g[1] for g in gateways])
 
-    dist_str = "  ".join(f"{d:.2f}m" for d in distances)
+    dist_str = "  ".join(f"{d:.2f}m(w={w:.2f})" for d, w in zip(distances, weights))
     logger.info("[BLE-TRI] 📐 Trilaterating  gateways=%d  distances=[%s]  init=(%.1f, %.1f)",
                 len(gateways), dist_str, x0, y0)
 
     result = least_squares(
         _residuals, x0=np.array([x0, y0]),
-        args=(gateways, distances),
+        args=(gateways, distances, weights),
         loss="soft_l1",        # robust to outlier readings
     )
 
