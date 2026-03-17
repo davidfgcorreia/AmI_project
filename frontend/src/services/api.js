@@ -26,6 +26,8 @@ export const getProduct = (id) =>
 // ── Shelves ──
 export const getShelves = () => request('/api/shelves');
 
+export const getGateways = () => request('/api/gateways');
+
 // ── Navigation ──
 export const navigate = (sessionId, { productIds, productQuery }) =>
   request('/api/navigate', {

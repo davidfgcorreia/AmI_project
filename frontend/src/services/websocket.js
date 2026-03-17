@@ -6,6 +6,8 @@
 let _ws = null;
 let _onPosition = null;
 let _reconnectTimer = null;
+let _gwWs = null;
+let _onGateways = null;
 
 export function connectTracking(sessionId, onPosition) {
   _onPosition = onPosition;
@@ -40,6 +42,55 @@ export function connectTracking(sessionId, onPosition) {
     console.error('[WS] Error:', err);
     _ws.close();
   };
+}
+
+export function connectGateways(onGateways) {
+  _onGateways = onGateways;
+
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const host = window.location.host;
+  const url = `${proto}://${host}/ws/gateways`;
+
+  _gwWs = new WebSocket(url);
+
+  _gwWs.onopen = () => {
+    console.log('[WS] Gateways connected');
+  };
+
+  _gwWs.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'gateways' && _onGateways) {
+        _onGateways(data.items || data);
+      }
+    } catch (e) {
+      // some messages may be plain text (pings)
+      try {
+        if (typeof event.data === 'string' && event.data.trim() === 'pong') {
+          return;
+        }
+      } catch (_e) {}
+      console.error('[WS] Gateways parse error:', e);
+    }
+  };
+
+  _gwWs.onclose = () => {
+    console.log('[WS] Gateways disconnected – reconnecting in 3 s');
+    setTimeout(() => connectGateways(onGateways), 3000);
+  };
+
+  _gwWs.onerror = (err) => {
+    console.error('[WS] Gateways error:', err);
+    _gwWs.close();
+  };
+}
+
+export function disconnectGateways() {
+  if (_gwWs) {
+    _gwWs.onclose = null;
+    _gwWs.close();
+    _gwWs = null;
+  }
 }
 
 export function sendIMU(data) {

@@ -23,16 +23,20 @@ const COLORS = {
   text: '#37474f',
 };
 
-export default function FloorMap({ shelves = [], userPos, path = [], targets = [] }) {
+export default function FloorMap({ shelves = [], userPos, path = [], targets = [], beacons = [] }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
+
+  // Keep latest rect for draw to use CSS pixels
+  const rectRef = useRef({ width: 300, height: 200 });
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const W = canvas.width;
-    const H = canvas.height;
+    // Use CSS pixel sizes (after DPR scaling ctx.setTransform was called)
+    const W = rectRef.current.width;
+    const H = rectRef.current.height;
 
     const sx = W / STORE_W;
     const sy = H / STORE_H;
@@ -94,6 +98,20 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillText(s.name || `S${s.id}`, tx(s.x), ty(s.y) + 3);
     });
 
+    // Beacons / Gateways
+    beacons.forEach((b) => {
+      ctx.fillStyle = '#2e7d32'; // green
+      ctx.beginPath();
+      ctx.arc(tx(b.x), ty(b.y), 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // beacon label
+      ctx.fillStyle = COLORS.text;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(b.id, tx(b.x) + 8, ty(b.y) + 4);
+    });
+
     // Navigation path
     if (path.length > 1) {
       ctx.strokeStyle = COLORS.path;
@@ -140,21 +158,72 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     }
 
     animRef.current = requestAnimationFrame(draw);
-  }, [shelves, userPos, path, targets]);
+  }, [shelves, userPos, path, targets, beacons]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // HiDPI
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    canvas.getContext('2d').scale(dpr, dpr);
+    function resize() {
+      // Fit the full store into the parent container while preserving aspect ratio
+      const parent = canvas.parentElement || canvas;
+      const pRect = parent.getBoundingClientRect();
+      const storeRatio = STORE_W / STORE_H;
+
+      // Candidate sizes: fit width, compute height; if too tall, fit height instead
+      let cssWidth = pRect.width;
+      let cssHeight = cssWidth / storeRatio;
+      if (cssHeight > pRect.height) {
+        cssHeight = pRect.height;
+        cssWidth = cssHeight * storeRatio;
+      }
+
+      // Decide whether to actually resize to avoid frequent small resizes.
+      const newCssWidth = Math.round(cssWidth);
+      const newCssHeight = Math.round(cssHeight);
+      const curr = rectRef.current || { width: 0, height: 0 };
+      const allowIncreaseFactor = 1.25; // require a larger jump to increase size
+
+      const becameSmaller = newCssWidth < curr.width - 1 || newCssHeight < curr.height - 1;
+      const becameMuchLarger = newCssWidth > Math.round(curr.width * allowIncreaseFactor) || newCssHeight > Math.round(curr.height * allowIncreaseFactor);
+
+      // Always initialize once
+      if (!canvas.dataset.fm_inited) {
+        canvas.dataset.fm_inited = '1';
+      } else if (!becameSmaller && !becameMuchLarger) {
+        // skip small changes to avoid heavy reflow/resize
+        return;
+      }
+
+      // Apply CSS size so the canvas element occupies the calculated area
+      canvas.style.width = `${newCssWidth}px`;
+      canvas.style.height = `${newCssHeight}px`;
+
+      // HiDPI backing store size
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // reset & scale for DPR
+
+      // store CSS pixel size for draw calculations
+      rectRef.current = { width: rect.width, height: rect.height };
+    }
+
+    // Initial resize + listeners
+    resize();
+    window.addEventListener('resize', resize);
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas.parentElement || canvas);
 
     draw();
-    return () => cancelAnimationFrame(animRef.current);
+
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener('resize', resize);
+      try { ro.disconnect(); } catch (e) {}
+    };
   }, [draw]);
 
   return (

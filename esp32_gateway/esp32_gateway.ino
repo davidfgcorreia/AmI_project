@@ -19,9 +19,15 @@
 
 // ── CONFIGURATION ───────────────────────────────────
 #define GATEWAY_ID   "esp32_A"          // Unique per gateway (esp32_A / B / C)
+<<<<<<< HEAD
 #define WIFI_SSID    "Dr House"
 #define WIFI_PASS    "12345678"
 #define MQTT_HOST    "172.20.10.12"     // Backend server IP
+=======
+#define WIFI_SSID    "TP-Link_9772"     // WiFi SSID
+#define WIFI_PASS    "99326685"       // WiFi password
+#define MQTT_HOST    "192.168.0.102"     // Backend server IP
+>>>>>>> 54b821a698c91c0b1078a7d564a125af9cbaebdd
 #define MQTT_PORT    1883
 #define MQTT_TOPIC   "ire/ble/rssi"
 #define SCAN_TIME    2                  // BLE scan duration (seconds)

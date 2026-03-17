@@ -94,13 +94,11 @@ AmI_project/
 │   │   ├── routers/        # API endpoints
 │   │   │   ├── products.py     # CRUD products & shelves
 │   │   │   ├── navigation.py   # Path computation
-│   │   │   ├── vision.py       # YOLO scan endpoint
 │   │   │   └── tracking.py     # WebSocket real-time position
 │   │   ├── services/       # Business logic
 │   │   │   ├── ble_trilateration.py  # RSSI → (x,y)
 │   │   │   ├── kalman_fusion.py      # BLE + IMU fusion
 │   │   │   ├── pathfinding.py        # A* + multi-route
-│   │   │   ├── cv_detection.py       # YOLO shelf analysis
 │   │   │   └── mqtt_client.py        # ESP32 MQTT listener
 │   │   └── main.py         # FastAPI app + lifespan
 │   ├── requirements.txt
