@@ -19,11 +19,7 @@ import { connectTracking, disconnectTracking, isConnected, connectGateways, disc
 import useIMU from './hooks/useIMU';
 
 function generateSessionId() {
-<<<<<<< HEAD
-  return 'LE_WH-1000XM4';
-=======
   return 'A32 de David';
->>>>>>> 54b821a698c91c0b1078a7d564a125af9cbaebdd
 }
 
 export default function App() {
