@@ -18,7 +18,7 @@ import { connectTracking, disconnectTracking, isConnected } from './services/web
 import useIMU from './hooks/useIMU';
 
 function generateSessionId() {
-  return 'ire-user';
+  return 'LE_WH-1000XM4';
 }
 
 export default function App() {

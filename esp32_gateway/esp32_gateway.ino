@@ -18,10 +18,10 @@
 #include <BLEAdvertisedDevice.h>
 
 // ── CONFIGURATION ───────────────────────────────────
-#define GATEWAY_ID   "esp32_B"          // Unique per gateway (esp32_A / B / C)
-#define WIFI_SSID    "NOS-2C40"
-#define WIFI_PASS    "JZYKNWJZ"
-#define MQTT_HOST    "192.168.1.63"     // Backend server IP
+#define GATEWAY_ID   "esp32_A"          // Unique per gateway (esp32_A / B / C)
+#define WIFI_SSID    "Dr House"
+#define WIFI_PASS    "12345678"
+#define MQTT_HOST    "172.20.10.12"     // Backend server IP
 #define MQTT_PORT    1883
 #define MQTT_TOPIC   "ire/ble/rssi"
 #define SCAN_TIME    2                  // BLE scan duration (seconds)

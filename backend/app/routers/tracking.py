@@ -141,4 +141,25 @@ async def post_ble_reading(reading: BLEReading):
     buf[reading.session_id][reading.gateway_id] = reading.rssi
     logger.info("[BLE] 📡 Reading  gw=%s  session=%s  rssi=%+.1f dBm",
                 reading.gateway_id, reading.session_id, reading.rssi)
+
+    # Push updated position to active WebSocket connection (e.g. frontend on desktop)
+    ble_readings = buf[reading.session_id]
+    if len(ble_readings) >= 3:
+        ws = _connections.get(reading.session_id)
+        if ws:
+            ble_pos = trilaterate(ble_readings)
+            if ble_pos:
+                tracker = get_tracker(reading.session_id)
+                tracker.update_ble(*ble_pos)
+                x, y = tracker.position
+                try:
+                    await ws.send_json({
+                        "type": "position",
+                        "x": round(x, 2),
+                        "y": round(y, 2),
+                        "accuracy": round(tracker.accuracy, 2),
+                    })
+                except Exception:
+                    pass
+
     return {"status": "ok"}

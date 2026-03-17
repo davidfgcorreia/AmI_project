@@ -1,0 +1,326 @@
+================================================================================
+  INTELLIGENT RETAIL ECOSYSTEM (IRE) — COMPLETE SETUP GUIDE
+  For first-time setup on a new machine with 3x ESP32 gateways
+================================================================================
+
+OVERVIEW
+--------
+The system has 4 main parts:
+  1. 3x ESP32 boards acting as BLE gateways (scan nearby Bluetooth devices)
+  2. A Python/FastAPI backend (trilateration, Kalman filter, A* navigation)
+  3. A Mosquitto MQTT broker (message bus between ESP32s and backend)
+  4. A React frontend PWA (floor map + product search)
+
+All machines (your laptop + all 3 ESP32s) must be on the SAME local network.
+
+
+================================================================================
+  PART 1 — PREREQUISITES (install once)
+================================================================================
+
+1.1  Python 3.11+
+     - Ubuntu/Debian:  sudo apt install python3.11 python3.11-venv python3-pip
+     - macOS:          brew install python@3.11
+     - Windows:        download from https://python.org (check "Add to PATH")
+
+1.2  Node.js 18+ and npm
+     - Ubuntu/Debian:  sudo apt install nodejs npm
+                       (or use nvm: https://github.com/nvm-sh/nvm)
+     - macOS:          brew install node
+     - Windows:        download from https://nodejs.org
+
+1.3  Mosquitto MQTT broker
+     - Ubuntu/Debian:  sudo apt install mosquitto mosquitto-clients
+     - macOS:          brew install mosquitto
+     - Windows:        download from https://mosquitto.org/download/
+
+1.4  Arduino IDE 2.x
+     - Download from:  https://www.arduino.cc/en/software
+     - Install the 2.x version (not the legacy 1.8.x)
+
+1.5  (Optional) Docker + Docker Compose — alternative to manual startup
+     - https://docs.docker.com/get-docker/
+
+
+================================================================================
+  PART 2 — ARDUINO IDE SETUP (for ESP32 flashing)
+================================================================================
+
+2.1  Add ESP32 board support
+     a. Open Arduino IDE
+     b. Go to:  File → Preferences
+     c. In "Additional boards manager URLs", add:
+           https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+     d. Click OK
+     e. Go to:  Tools → Board → Boards Manager
+     f. Search "esp32" and install "esp32 by Espressif Systems" (version 2.x or 3.x)
+
+2.2  Install the PubSubClient library (MQTT)
+     a. Go to:  Sketch → Include Library → Manage Libraries
+     b. Search "PubSubClient" by Nick O'Leary
+     c. Install it (any recent version, e.g. 2.8)
+
+2.3  Select the correct board
+     a. Plug in one ESP32 via USB
+     b. Go to:  Tools → Board → esp32 → "ESP32 Dev Module"
+        (if your board is a different model like WROOM-32, WROVER, etc.,
+         select the matching variant)
+     c. Go to:  Tools → Port → select the COM port (Windows: COMx, Linux/macOS: /dev/ttyUSBx or /dev/cu.usbserialx)
+        - On Linux you may need:  sudo usermod -aG dialout $USER  (then log out/in)
+
+
+================================================================================
+  PART 3 — FIND YOUR MACHINE'S LOCAL IP ADDRESS
+================================================================================
+
+The ESP32s need to know the IP of the machine running the MQTT broker.
+
+On the machine running the backend:
+  - Linux/macOS:  ip addr show   OR   hostname -I
+  - Windows:      ipconfig
+
+Look for the IP on your local WiFi interface (e.g. 192.168.x.x or 10.x.x.x).
+Note it down — you will use it in the next step.
+
+Example: 192.168.1.42
+
+
+================================================================================
+  PART 4 — CONFIGURE AND FLASH THE ESP32 GATEWAYS
+================================================================================
+
+Open the file:  esp32_gateway/esp32_gateway.ino
+
+At the top you will find the configuration block:
+
+    #define GATEWAY_ID   "esp32_A"        // <-- CHANGE PER BOARD
+    #define WIFI_SSID    "Dr House"       // <-- YOUR WIFI NETWORK NAME
+    #define WIFI_PASS    "12345678"       // <-- YOUR WIFI PASSWORD
+    #define MQTT_HOST    "172.20.10.12"   // <-- YOUR MACHINE'S LOCAL IP
+    #define MQTT_PORT    1883             // leave as-is
+    #define MQTT_TOPIC   "ire/ble/rssi"   // leave as-is
+    #define SCAN_TIME    2               // BLE scan duration in seconds
+
+4.1  Flash GATEWAY A
+     - Set:   GATEWAY_ID = "esp32_A"
+     - Set:   WIFI_SSID  = "YourNetworkName"
+     - Set:   WIFI_PASS  = "YourPassword"
+     - Set:   MQTT_HOST  = "192.168.x.x"   (your machine's IP from Part 3)
+     - Connect the first ESP32 via USB
+     - Select the correct Port in Tools → Port
+     - Click Upload (the right-arrow button)
+     - Wait for "Done uploading"
+
+4.2  Flash GATEWAY B
+     - Change ONLY:  GATEWAY_ID = "esp32_B"
+     - Keep WiFi and MQTT_HOST the same
+     - Connect the second ESP32, select its Port, click Upload
+
+4.3  Flash GATEWAY C
+     - Change ONLY:  GATEWAY_ID = "esp32_C"
+     - Keep WiFi and MQTT_HOST the same
+     - Connect the third ESP32, select its Port, click Upload
+
+4.4  Verify each gateway works
+     After flashing, open the Serial Monitor (Tools → Serial Monitor, baud 115200).
+     You should see:
+       Connecting to WiFi... connected!
+       MQTT connecting... connected!
+       Published: {"gateway_id":"esp32_A","session_id":"...","rssi":-70}
+
+     If WiFi fails: double-check SSID/password (case-sensitive).
+     If MQTT fails: verify the IP address and that Mosquitto is running (see Part 5).
+
+
+================================================================================
+  PART 5 — CONFIGURE THE BACKEND
+================================================================================
+
+5.1  Gateway physical positions
+     IMPORTANT: The backend uses the physical (x, y) positions of each gateway
+     in the store (in metres from the bottom-left corner).
+     You MUST update these to match where you physically place the ESP32s.
+
+     Open:  backend/app/core/config.py
+
+     Find and update:
+
+         GATEWAY_POSITIONS = {
+             "esp32_A": (0.0, 0.0),    # x, y in metres from store origin
+             "esp32_B": (10.0, 0.0),   # adjust to real placement
+             "esp32_C": (5.0, 8.0),    # adjust to real placement
+         }
+
+     Also check that the store dimensions match your deployment area:
+
+         STORE_WIDTH  = 12.0   # metres — adjust if needed
+         STORE_HEIGHT = 10.0   # metres — adjust if needed
+
+5.2  BLE calibration (optional but recommended for accuracy)
+     In the same config.py file:
+
+         BLE_TX_POWER    = -59   # RSSI at 1m from beacon — calibrate by
+                                 # measuring RSSI with your phone 1m from
+                                 # each gateway and averaging
+         BLE_PATH_LOSS_EXP = 2.7  # Indoor path-loss exponent
+                                   # typical range: 2.0 (open) – 3.5 (cluttered)
+
+5.3  Session ID (tracked device identifier)
+     The system identifies the tracked phone by a session_id.
+     Currently it is hardcoded in:  frontend/src/App.jsx  line 21:
+
+         function generateSessionId() {
+           return 'LE_WH-1000XM4';   // <-- this must match what the ESP32s see
+         }
+
+     The ESP32 gateways use the BLE device name (or MAC address) as session_id.
+     Your phone's Bluetooth device name must match this string, OR you change
+     this function to return your phone's Bluetooth name.
+
+     To find your phone's Bluetooth name as seen by the ESP32:
+     - Open Serial Monitor on any gateway
+     - Turn on your phone's Bluetooth
+     - Watch the published payloads for your device's name/MAC
+     - Update the return value in generateSessionId() to match exactly
+
+
+================================================================================
+  PART 6 — START THE SYSTEM
+================================================================================
+
+---- OPTION A: Manual startup (recommended for development) ----
+
+Open 3 separate terminal windows.
+
+TERMINAL 1 — MQTT Broker:
+  Linux/macOS:
+    mosquitto -c mosquitto.conf
+  Windows:
+    "C:\Program Files\mosquitto\mosquitto.exe" -c mosquitto.conf
+  (Run from the root of the project, where mosquitto.conf is located)
+
+TERMINAL 2 — Backend:
+  cd backend
+  python3 -m venv venv
+  source venv/bin/activate          # Windows: venv\Scripts\activate
+  pip install -r requirements.txt   # first time only
+  uvicorn app.main:app --reload --port 8000
+
+  The backend will be available at:  http://localhost:8000
+  API docs at:                       http://localhost:8000/docs
+
+TERMINAL 3 — Frontend:
+  cd frontend
+  npm install                       # first time only
+  npm run dev
+
+  The frontend will be available at:  http://localhost:3000
+
+
+---- OPTION B: Docker (starts everything at once) ----
+
+  Requires Docker and Docker Compose installed.
+
+  docker-compose up --build
+
+  This starts Mosquitto, the backend, and the frontend together.
+  Use docker-compose down to stop.
+
+
+================================================================================
+  PART 7 — TEST WITHOUT A PHONE (using the simulator)
+================================================================================
+
+If you don't have a phone ready, the simulator replaces both the ESP32s and
+the phone for quick testing:
+
+  cd simulator
+  python simulator.py
+
+This will:
+  - POST fake BLE readings from all 3 gateways to the backend
+  - Send fake IMU data (walking path) via WebSocket
+  - Show an ASCII map of the store in the terminal
+
+Options:
+  --speed 0.5          walk slower
+  --session my-device  use a custom session id
+  --loop               repeat the path indefinitely
+  --mqtt               use MQTT instead of HTTP (requires mosquitto running)
+
+Then open http://localhost:3000 and you should see the dot moving on the map.
+
+
+================================================================================
+  PART 8 — ACCESSING THE FRONTEND FROM A PHONE
+================================================================================
+
+To use the PWA from your phone (for real IMU data):
+
+1. Your phone must be on the SAME WiFi network as your laptop.
+2. Find your laptop's local IP (see Part 3).
+3. On your phone's browser, open:  http://192.168.x.x:3000
+   (replace with your laptop's actual IP)
+4. The browser will ask for motion/orientation permission — allow it.
+5. The frontend proxies WebSocket and API calls through Vite, so the phone
+   can reach the backend automatically.
+
+Note: For PWA install and motion sensor access on iOS, the page must be served
+over HTTPS or from localhost. On Android Chrome, HTTP on local network works.
+
+
+================================================================================
+  PART 9 — QUICK REFERENCE: ALL CONSTANTS TO CHANGE
+================================================================================
+
+FILE: esp32_gateway/esp32_gateway.ino
+  - GATEWAY_ID       → unique per board: "esp32_A", "esp32_B", "esp32_C"
+  - WIFI_SSID        → your WiFi network name
+  - WIFI_PASS        → your WiFi password
+  - MQTT_HOST        → your laptop/server's local IP address
+
+FILE: backend/app/core/config.py
+  - GATEWAY_POSITIONS → (x, y) in metres for each of the 3 gateways
+  - STORE_WIDTH       → width of your deployment area in metres
+  - STORE_HEIGHT      → height of your deployment area in metres
+  - BLE_TX_POWER      → RSSI at 1m (calibrate per environment, default -59)
+  - BLE_PATH_LOSS_EXP → path-loss exponent (default 2.7, raise for cluttered spaces)
+
+FILE: frontend/src/App.jsx  (line 21)
+  - generateSessionId() return value → must match your phone's Bluetooth name
+
+
+================================================================================
+  PART 10 — TROUBLESHOOTING
+================================================================================
+
+ESP32 won't connect to WiFi:
+  - Check SSID/password are correct and case-sensitive
+  - 2.4 GHz networks only — ESP32 does not support 5 GHz
+
+ESP32 MQTT connection fails:
+  - Confirm mosquitto is running: mosquitto -c mosquitto.conf
+  - Confirm the IP in MQTT_HOST matches your machine's current IP
+  - Check firewall: port 1883 must be open locally
+    Linux: sudo ufw allow 1883
+    Windows: add inbound rule for port 1883 in Windows Firewall
+
+Backend fails to start (port in use):
+  - Kill the process using port 8000:
+    Linux/macOS: lsof -ti:8000 | xargs kill
+    Windows:     netstat -ano | findstr :8000  then  taskkill /PID <pid> /F
+
+No position shown on map:
+  - Check that all 3 gateways are publishing (Serial Monitor)
+  - Check backend logs for "[BLE]" lines
+  - Verify session_id in frontend matches the Bluetooth name the gateways see
+  - Check the BLE buffer: GET http://localhost:8000/api/ble/buffer
+
+Frontend can't reach backend:
+  - Make sure the backend is running on port 8000
+  - Vite dev server proxies /api and /ws to localhost:8000 automatically
+  - Check vite.config.js proxy section if something seems wrong
+
+================================================================================
+  END OF GUIDE
+================================================================================

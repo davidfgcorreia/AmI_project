@@ -185,6 +185,33 @@ def print_store_map(pos: tuple[float, float], gateways: dict):
     print(f'  User: ({pos[0]:.1f}, {pos[1]:.1f}) m')
 
 
+# ── Static mode ────────────────────────────────────────────────────────
+
+async def run_static_mode(session_id: str, pos: tuple[float, float],
+                          interval: float, backend_url: str, quiet: bool,
+                          gateways: dict | None = None):
+    """Posts fixed RSSI readings forever from a single position."""
+    import httpx
+
+    active_gateways = gateways or GATEWAY_POSITIONS
+
+    async with httpx.AsyncClient(base_url=backend_url, timeout=5) as client:
+        print(f'\n  Broadcasting static position {pos} … (Ctrl+C to stop)\n')
+        step = 0
+        while True:
+            readings = generate_rssi_readings(pos, session_id, active_gateways)
+            if not quiet:
+                rssi_str = '  '.join(f'{r["gateway_id"][-1]}:{r["rssi"]:+.0f}dBm' for r in readings)
+                print(f'  [{step}] pos={pos}  {rssi_str}')
+            for reading in readings:
+                try:
+                    await client.post('/api/ble/reading', json=reading)
+                except Exception:
+                    pass
+            step += 1
+            await asyncio.sleep(interval)
+
+
 # ── HTTP mode (no MQTT) ────────────────────────────────────────────────
 
 async def run_http_mode(session_id: str, path: list[tuple[float, float]],
@@ -380,6 +407,8 @@ examples:
                         help='Suppress the ASCII map display')
     parser.add_argument('--loop', action='store_true',
                         help='Loop the path indefinitely')
+    parser.add_argument('--static', nargs=2, type=float, metavar=('X', 'Y'),
+                        help='Broadcast a fixed RSSI from position X Y forever (e.g. --static 5 4)')
     parser.add_argument('--gateways', nargs='+', metavar='GW',
                         help='Only simulate these gateways (e.g. --gateways esp32_C)')
     args = parser.parse_args()
@@ -408,6 +437,15 @@ examples:
     print('─' * 54)
 
     try:
+        if args.static:
+            static_pos = tuple(args.static)
+            print(f'  Static pos: {static_pos}')
+            print('─' * 54)
+            asyncio.run(run_static_mode(
+                args.session, static_pos, args.speed,
+                args.backend, args.quiet,
+                gateways=active_gateways,
+            ))
         while True:
             if args.mqtt:
                 asyncio.run(run_mqtt_mode(

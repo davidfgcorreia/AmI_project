@@ -224,5 +224,6 @@ input:focus, select:focus { border-color: var(--primary); }
 
 /* ── Responsive ── */
 @media (min-width: 768px) {
-  .app-body { max-width: 480px; margin: 0 auto; }
+  .app-body { max-width: 900px; margin: 0 auto; }
+  .map-container { aspect-ratio: 12/10; max-height: calc(100dvh - 160px); }
 }
