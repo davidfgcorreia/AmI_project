@@ -165,7 +165,7 @@ input:focus, select:focus { border-color: var(--primary); }
 .map-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 12/10;
+  aspect-ratio: 12/5;
   background: #e8eaed;
   border-radius: var(--radius);
   overflow: hidden;
@@ -225,5 +225,5 @@ input:focus, select:focus { border-color: var(--primary); }
 /* ── Responsive ── */
 @media (min-width: 768px) {
   .app-body { max-width: 900px; margin: 0 auto; }
-  .map-container { aspect-ratio: 12/10; max-height: calc(100dvh - 160px); }
+  .map-container { aspect-ratio: 12/5; max-height: calc(100dvh - 160px); }
 }
