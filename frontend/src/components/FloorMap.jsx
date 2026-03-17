@@ -9,7 +9,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 
 const STORE_W = 12;  // metres
-const STORE_H = 10;
+const STORE_H = 5;
 
 const COLORS = {
   bg: '#f0f2f5',
