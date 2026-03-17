@@ -110,15 +110,15 @@ async def _seed_demo_data():
             return  # already seeded
 
         shelves = [
-            Shelf(name="Aisle 1 – Left",   aisle="1", x=2.0,  y=2.0,  width=1.2, height=2.0),
-            Shelf(name="Aisle 1 – Right",  aisle="1", x=4.0,  y=2.0,  width=1.2, height=2.0),
-            Shelf(name="Aisle 2 – Left",   aisle="2", x=2.0,  y=5.0,  width=1.2, height=2.0),
-            Shelf(name="Aisle 2 – Right",  aisle="2", x=4.0,  y=5.0,  width=1.2, height=2.0),
-            Shelf(name="Aisle 3 – Left",   aisle="3", x=7.0,  y=2.0,  width=1.2, height=2.0),
-            Shelf(name="Aisle 3 – Right",  aisle="3", x=9.0,  y=2.0,  width=1.2, height=2.0),
-            Shelf(name="Aisle 4 – Left",   aisle="4", x=7.0,  y=5.0,  width=1.2, height=2.0),
-            Shelf(name="Aisle 4 – Right",  aisle="4", x=9.0,  y=5.0,  width=1.2, height=2.0),
-            Shelf(name="End-Cap North",     aisle="EC", x=5.5, y=8.5, width=2.0, height=1.5),
+            Shelf(name="Aisle A – Row 1",  aisle="A", x=2.5, y=1.2, width=1.2, height=0.6),
+            Shelf(name="Aisle A – Row 2",  aisle="A", x=2.5, y=2.7, width=1.2, height=0.6),
+            Shelf(name="Aisle A – Row 3",  aisle="A", x=2.5, y=4.2, width=1.2, height=0.6),
+            Shelf(name="Aisle B – Row 1",  aisle="B", x=6.0, y=1.2, width=1.2, height=0.6),
+            Shelf(name="Aisle B – Row 2",  aisle="B", x=6.0, y=2.7, width=1.2, height=0.6),
+            Shelf(name="Aisle B – Row 3",  aisle="B", x=6.0, y=4.2, width=1.2, height=0.6),
+            Shelf(name="Aisle C – Row 1",  aisle="C", x=9.5, y=1.2, width=1.2, height=0.6),
+            Shelf(name="Aisle C – Row 2",  aisle="C", x=9.5, y=2.7, width=1.2, height=0.6),
+            Shelf(name="Aisle C – Row 3",  aisle="C", x=9.5, y=4.2, width=1.2, height=0.6),
         ]
         db.add_all(shelves)
         await db.flush()

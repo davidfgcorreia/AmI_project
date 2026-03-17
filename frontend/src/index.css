@@ -165,15 +165,18 @@ input:focus, select:focus { border-color: var(--primary); }
 .map-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 12/5;
+  height: calc(100dvh - 13rem);
+  min-height: 180px;
   background: #e8eaed;
   border-radius: var(--radius);
   overflow: hidden;
   touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .map-container canvas {
-  width: 100%;
-  height: 100%;
+  display: block;
 }
 
 /* ── Shelf view ── */
@@ -225,5 +228,5 @@ input:focus, select:focus { border-color: var(--primary); }
 /* ── Responsive ── */
 @media (min-width: 768px) {
   .app-body { max-width: 900px; margin: 0 auto; }
-  .map-container { aspect-ratio: 12/5; max-height: calc(100dvh - 160px); }
+  .map-container { height: calc(100dvh - 13rem); }
 }

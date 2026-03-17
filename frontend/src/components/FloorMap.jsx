@@ -228,7 +228,7 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
 
   return (
     <div className="map-container">
-      <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+      <canvas ref={canvasRef} />
     </div>
   );
 }
