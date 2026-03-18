@@ -322,5 +322,132 @@ Frontend can't reach backend:
   - Check vite.config.js proxy section if something seems wrong
 
 ================================================================================
+  PART 11 — BLE CALIBRATION PROCEDURE (recommended before going live)
+================================================================================
+
+Run this once in the real room after the hardware is installed.
+It measures the actual RSSI-to-distance curve for your specific ESP32 boards
+and lets you verify positioning accuracy across the whole room.
+
+INSTALL CALIBRATION DEPENDENCIES (once):
+  cd calibration
+  pip install -r requirements.txt
+
+
+---- STEP 11.1: Distance calibration (one per ESP32, ~10 min each) ----
+
+Goal: measure how RSSI drops with distance for each gateway radio.
+
+Setup:
+  - Backend must be running (Part 6)
+  - Phone must be advertising BLE (or simulator running)
+  - Tape measure on the floor
+  - Note your session ID (shown in the frontend header, top-right)
+
+Run for each gateway:
+  python calibrate.py distance --gateway esp32_A --session YOUR_SESSION_ID
+  python calibrate.py distance --gateway esp32_B --session YOUR_SESSION_ID
+  python calibrate.py distance --gateway esp32_C --session YOUR_SESSION_ID
+
+The script prompts you to stand at 0.5 m, 1 m, 1.5 m, 2 m, 3 m, 4 m, 5 m
+from that ESP32.  At each distance, stand still for 20 seconds.
+
+Tips:
+  - Hold phone at chest height, facing the ESP32
+  - Keep your body between you and the ESP32 (worst-case signal matters)
+  - Repeat with body rotated 90° if you want a better average
+
+
+---- STEP 11.2: Get new config values ----
+
+  python analyse.py distance
+
+This prints a table of measured RSSI at each distance and outputs a box
+with the exact values to paste into backend/app/core/config.py:
+
+  BLE_TX_POWER         — RSSI at 1 m reference (currently -70)
+  BLE_FAR_DBM_PER_M    — signal loss per metre beyond 1 m (currently 5.0)
+  BLE_NEAR_RSSI        — boundary between near/far segments
+  BLE_NEAR_DIST_AT_REF — distance (m) where RSSI hits -50 dBm
+
+After updating config.py, restart the backend.
+
+
+---- STEP 11.3: Position accuracy survey (~20 min) ----
+
+Goal: walk the room on a grid and measure how accurate trilateration is.
+
+Setup:
+  - Mark 10–15 points on the floor with tape every ~1–2 m
+  - Measure each point's (x, y) from the bottom-left corner of the room
+  - All 3 ESP32s must be active
+
+  python calibrate.py survey --session YOUR_SESSION_ID
+
+At each marked point:
+  1. Enter the real coordinates: e.g.  3.5 2.0
+  2. Stand still — the script records for ~10 seconds automatically
+  3. Move to the next point
+  Type  done  when finished.
+
+
+---- STEP 11.4: Analyse survey results ----
+
+  python analyse.py survey           # table + ASCII heatmap of the room
+  python analyse.py survey --plot    # adds a matplotlib scatter plot
+
+The heatmap shows which areas have good/poor coverage:
+  ▓ < 0.5 m   ▒ < 1.0 m   ░ < 1.5 m   ✗ ≥ 1.5 m
+
+If a corner is consistently bad, that corner has poor coverage from at
+least one ESP32.  Move that gateway closer to the problem area.
+
+
+---- STEP 11.5: Tuning tips ----
+
+Mean error > 1.5 m after running steps above:
+  - Verify no two ESP32s are nearly collinear (straight line)
+    Triangle area = 0.5 * |det([B-A, C-A])| should be > 10 m²
+    Optimal layout for a 12×5 m room:
+      A at (0.5, 0.5) bottom-left corner
+      B at (11.5, 0.5) bottom-right corner
+      C at (6.0, 4.7) top-centre
+
+  - If position jitters a lot but averages correctly:
+    Lower POS_ALPHA in backend/app/routers/tracking.py (try 0.3)
+
+  - If position lags behind movement:
+    Raise POS_ALPHA (try 0.8)
+
+  - If one gateway consistently reads 3–5 dBm higher/lower than others:
+    Add a per-gateway TX power offset in config.py
+
+
+================================================================================
+  PART 12 — QUICK REFERENCE: CALIBRATION COMMANDS
+================================================================================
+
+  # Collect distance data (run once per gateway)
+  python calibration/calibrate.py distance --gateway esp32_A --session SESSION_ID
+  python calibration/calibrate.py distance --gateway esp32_B --session SESSION_ID
+  python calibration/calibrate.py distance --gateway esp32_C --session SESSION_ID
+
+  # Fit model → get config values to paste
+  python calibration/analyse.py distance
+
+  # Position accuracy survey
+  python calibration/calibrate.py survey --session SESSION_ID
+
+  # Analyse survey results
+  python calibration/analyse.py survey --plot
+
+  # Live BLE buffer (useful for debugging signal reception)
+  curl http://localhost:8000/api/ble/buffer
+
+  # Recent raw RSSI log (last 500 readings)
+  curl http://localhost:8000/api/ble/log
+
+
+================================================================================
   END OF GUIDE
 ================================================================================

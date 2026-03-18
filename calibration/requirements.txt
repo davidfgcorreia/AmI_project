@@ -1,0 +1,5 @@
+httpx
+websockets
+numpy
+scipy
+matplotlib
