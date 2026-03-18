@@ -39,16 +39,19 @@ def rssi_to_distance(rssi: float) -> float:
 
 def _residuals(point, gateways, distances, weights):
     x, y = point
-    return [
+    return np.array([
         w * (math.sqrt((x - gx)**2 + (y - gy)**2) - d)
         for (gx, gy), d, w in zip(gateways, distances, weights)
-    ]
+    ])
 
 
-def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
+def trilaterate(readings: dict[str, float]) -> tuple[float, float, float] | None:
     """
     Trilaterate user position from BLE RSSI readings (≥ 3 gateways).
-    Returns (x, y) clamped to store bounds, or None on failure.
+
+    Returns (x, y, accuracy_m) clamped to store bounds, or None on failure.
+    accuracy_m is the RMS of unweighted distance residuals — a rough estimate
+    of how well the circles intersect at the solution point.
     """
     gateways, distances, weights = [], [], []
 
@@ -58,7 +61,8 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
             continue
         gateways.append(pos)
         distances.append(rssi_to_distance(rssi))
-        # Strong signal → high weight (signal can only be attenuated, not amplified)
+        # Amplitude ratio relative to 1-m reference.
+        # Stronger signal → higher weight (can only be attenuated, not amplified).
         weights.append(max(0.05, 10 ** ((rssi - BLE_TX_POWER) / 20)))
 
     if len(gateways) < 3:
@@ -72,7 +76,7 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
             _residuals, x0=[x0, y0],
             args=(gateways, distances, weights),
             loss="soft_l1",
-            bounds=([0, 0], [STORE_WIDTH, STORE_HEIGHT]),  # clamp to room
+            bounds=([0, 0], [STORE_WIDTH, STORE_HEIGHT]),
         )
     except Exception as e:
         logger.warning("[BLE-TRI] least_squares failed: %s", e)
@@ -84,5 +88,12 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
         logger.warning("[BLE-TRI] Non-finite result, discarding")
         return None
 
-    logger.debug("[BLE-TRI] → (%.2f, %.2f)  cost=%.4f", x_out, y_out, result.cost)
-    return x_out, y_out
+    # Unweighted RMS residual: average circle-fit error in metres
+    raw_residuals = [
+        math.sqrt((x_out - gx)**2 + (y_out - gy)**2) - d
+        for (gx, gy), d in zip(gateways, distances)
+    ]
+    accuracy_m = round(math.sqrt(sum(r**2 for r in raw_residuals) / len(raw_residuals)), 2)
+
+    logger.debug("[BLE-TRI] → (%.2f, %.2f)  accuracy=%.2fm", x_out, y_out, accuracy_m)
+    return x_out, y_out, accuracy_m

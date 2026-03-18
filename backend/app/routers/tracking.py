@@ -46,9 +46,10 @@ async def tracking_ws(ws: WebSocket, session_id: str):
     csv_log  = get_csv_logger(session_id)
     logger.info("[WS] Connected  session=%s", session_id)
 
-    # Smoothed position state (EMA, BLE-only)
-    pos_x: float | None = None
-    pos_y: float | None = None
+    # Smoothed position + last known accuracy (EMA, BLE-only)
+    pos_x:    float | None = None
+    pos_y:    float | None = None
+    accuracy: float        = 1.5   # metres; updated from trilateration residuals
 
     stop_event = asyncio.Event()
 
@@ -87,24 +88,25 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 if readings:
                     csv_log.record_ble(readings)
                     log_ble_reading(session_id, readings)
-                    pos = trilaterate(readings)
-                    if pos and math.isfinite(pos[0]) and math.isfinite(pos[1]):
-                        csv_log.record_trilateration(*pos)
+                    result = trilaterate(readings)
+                    if result:
+                        new_x, new_y, accuracy = result
+                        csv_log.record_trilateration(new_x, new_y)
                         if pos_x is None:
-                            pos_x, pos_y = pos
+                            pos_x, pos_y = new_x, new_y
                         else:
-                            pos_x = POS_ALPHA * pos[0] + (1 - POS_ALPHA) * pos_x
-                            pos_y = POS_ALPHA * pos[1] + (1 - POS_ALPHA) * pos_y
+                            pos_x = POS_ALPHA * new_x + (1 - POS_ALPHA) * pos_x
+                            pos_y = POS_ALPHA * new_y + (1 - POS_ALPHA) * pos_y
 
                 if pos_x is None:
                     continue  # no position yet — don't send
 
-                csv_log.record_fused(pos_x, pos_y, 0.0)
+                csv_log.record_fused(pos_x, pos_y, accuracy)
                 await ws.send_json({
                     "type":     "position",
                     "x":        round(pos_x, 2),
                     "y":        round(pos_y, 2),
-                    "accuracy": 1.0,
+                    "accuracy": accuracy,
                 })
         except WebSocketDisconnect:
             pass
@@ -159,14 +161,15 @@ async def post_ble_reading(reading: BLEReading):
         log_ble_reading(reading.session_id, readings)
         ws = _connections.get(reading.session_id)
         if ws:
-            pos = trilaterate(readings)
-            if pos and math.isfinite(pos[0]) and math.isfinite(pos[1]):
+            result = trilaterate(readings)
+            if result:
+                rx, ry, racc = result
                 try:
                     await ws.send_json({
                         "type":     "position",
-                        "x":        round(pos[0], 2),
-                        "y":        round(pos[1], 2),
-                        "accuracy": 1.0,
+                        "x":        round(rx, 2),
+                        "y":        round(ry, 2),
+                        "accuracy": racc,
                     })
                 except Exception:
                     pass
