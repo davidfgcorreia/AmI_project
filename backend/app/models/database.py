@@ -1,5 +1,5 @@
 """
-SQLAlchemy models – Product, Shelf, ShelfImage, NavigationSession.
+SQLAlchemy models - Product, Shelf, ShelfImage, NavigationSession.
 
 Uses SQLAlchemy 2.0 Mapped[] annotations so that Pyright / type checkers
 correctly infer Python types (float, int, str, …) instead of Column[Unknown].
@@ -23,7 +23,7 @@ class Shelf(Base):
     __tablename__ = "shelves"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(120))          # e.g. "Aisle 3 – Left"
+    name: Mapped[str] = mapped_column(String(120))          # e.g. "Aisle 3 - Left"
     aisle: Mapped[str] = mapped_column(String(60))
     x: Mapped[float] = mapped_column()                      # centre-point (m)
     y: Mapped[float] = mapped_column()

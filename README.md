@@ -1,7 +1,7 @@
 # Intelligent Retail Ecosystem (IRE)
-### Ambient Intelligence – In-Store Navigation & Product Finder
+### Ambient Intelligence - In-Store Navigation & Product Finder
 
-> AmI project – Alameda G11  
+> AmI project - Alameda G11  
 > David Correia · Gonçalo Oliveira · Pedro Duarte
 
 ---
@@ -182,6 +182,6 @@ The backend auto-seeds:
 
 ## Milestones
 
-- [x] **M1 – Basic**: ESP32 pipeline, 2D map, raw BLE tracking
-- [x] **M2 – Intermediate**: Hybrid BLE+IMU fusion, shelf view
-- [x] **M3 – Advanced**: YOLO detection, voice search, multi-product routing
+- [x] **M1 - Basic**: ESP32 pipeline, 2D map, raw BLE tracking
+- [x] **M2 - Intermediate**: Hybrid BLE+IMU fusion, shelf view
+- [x] **M3 - Advanced**: YOLO detection, voice search, multi-product routing

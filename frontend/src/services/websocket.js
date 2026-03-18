@@ -9,12 +9,21 @@ let _reconnectTimer = null;
 let _gwWs = null;
 let _onGateways = null;
 
+// In Android builds VITE_BACKEND_URL = 'http://192.168.x.x:8000'
+// so derive the WS host from that; otherwise fall back to the page host.
+function wsBase() {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  if (backendUrl) {
+    return backendUrl.replace(/^http/, 'ws');
+  }
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${window.location.host}`;
+}
+
 export function connectTracking(sessionId, onPosition) {
   _onPosition = onPosition;
 
-  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = window.location.host;
-  const url = `${proto}://${host}/ws/track/${sessionId}`;
+  const url = `${wsBase()}/ws/track/${sessionId}`;
 
   _ws = new WebSocket(url);
 
@@ -47,9 +56,7 @@ export function connectTracking(sessionId, onPosition) {
 export function connectGateways(onGateways) {
   _onGateways = onGateways;
 
-  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = window.location.host;
-  const url = `${proto}://${host}/ws/gateways`;
+  const url = `${wsBase()}/ws/gateways`;
 
   _gwWs = new WebSocket(url);
 

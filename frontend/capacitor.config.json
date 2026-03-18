@@ -1,0 +1,11 @@
+{
+  "appId": "com.ire.storenavigator",
+  "appName": "Store Navigator",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "cleartext": true
+  }
+}

@@ -1,5 +1,5 @@
 """
-Intelligent Retail Ecosystem – FastAPI Backend
+Intelligent Retail Ecosystem - FastAPI Backend
 ═══════════════════════════════════════════════
 Central server handling:
   • BLE trilateration + IMU/PDR Kalman fusion
@@ -31,7 +31,7 @@ logger = logging.getLogger("ire")
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("═══════════════════════════════════════════════")
-    logger.info("  Intelligent Retail Ecosystem – starting up")
+    logger.info("  Intelligent Retail Ecosystem - starting up")
     logger.info("═══════════════════════════════════════════════")
     logger.info("Creating database tables …")
     async with engine.begin() as conn:
@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
     logger.info("Store: %.0f×%.0f m  grid=%.1fm  gateways=%s",
                 STORE_WIDTH, STORE_HEIGHT, GRID_RESOLUTION,
                 list(GATEWAY_POSITIONS.keys()))
-    logger.info("✔  Backend ready – listening on http://0.0.0.0:8000")
+    logger.info("✔  Backend ready - listening on http://0.0.0.0:8000")
     yield
 
     # Shutdown
@@ -63,11 +63,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Intelligent Retail Ecosystem",
     version="1.0.0",
-    description="AmI backend – BLE fusion, navigation, CV, real-time tracking",
+    description="AmI backend - BLE fusion, navigation, CV, real-time tracking",
     lifespan=lifespan,
 )
 
-# CORS – allow PWA on any port during development
+# CORS - allow PWA on any port during development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -85,7 +85,6 @@ from .routers.products import router as products_router    # noqa: E402
 from .routers.navigation import router as nav_router       # noqa: E402
 from .routers.tracking import router as tracking_router    # noqa: E402
 from .routers.gateways import router as gateways_router    # noqa: E402
-
 app.include_router(products_router)
 app.include_router(nav_router)
 app.include_router(tracking_router)
@@ -98,10 +97,14 @@ async def health():
     return {"status": "ok", "service": "Intelligent Retail Ecosystem"}
 
 
-# ── Demo seed ──
+# ── Supermarket seed ──
 async def _seed_demo_data():
-    """Insert sample shelves & products if the DB is empty."""
+    """Seed shelves + products from supermarket.json if the DB is empty.
+    Delete backend/store.db to re-seed from scratch.
+    """
+    import json
     from .models.database import Product, Shelf
+    from .core.config import SUPERMARKET_JSON
     from sqlalchemy import select
 
     async with SessionLocal() as db:
@@ -109,43 +112,87 @@ async def _seed_demo_data():
         if result.scalar_one_or_none():
             return  # already seeded
 
-        shelves = [
-            Shelf(name="Aisle A – Row 1",  aisle="A", x=2.5, y=1.2, width=1.2, height=0.6),
-            Shelf(name="Aisle A – Row 2",  aisle="A", x=2.5, y=2.7, width=1.2, height=0.6),
-            Shelf(name="Aisle A – Row 3",  aisle="A", x=2.5, y=4.2, width=1.2, height=0.6),
-            Shelf(name="Aisle B – Row 1",  aisle="B", x=6.0, y=1.2, width=1.2, height=0.6),
-            Shelf(name="Aisle B – Row 2",  aisle="B", x=6.0, y=2.7, width=1.2, height=0.6),
-            Shelf(name="Aisle B – Row 3",  aisle="B", x=6.0, y=4.2, width=1.2, height=0.6),
-            Shelf(name="Aisle C – Row 1",  aisle="C", x=9.5, y=1.2, width=1.2, height=0.6),
-            Shelf(name="Aisle C – Row 2",  aisle="C", x=9.5, y=2.7, width=1.2, height=0.6),
-            Shelf(name="Aisle C – Row 3",  aisle="C", x=9.5, y=4.2, width=1.2, height=0.6),
-        ]
-        db.add_all(shelves)
-        await db.flush()
+        # ── Load product catalogue ──
+        if not SUPERMARKET_JSON.exists():
+            logger.warning("supermarket.json not found at %s - skipping seed", SUPERMARKET_JSON)
+            return
 
-        products = [
-            Product(name="KALLAX Shelf Unit",       category="Furniture",  price=49.99,  shelf_id=1, shelf_level=1),
-            Product(name="BILLY Bookcase",           category="Furniture",  price=39.99,  shelf_id=1, shelf_level=2),
-            Product(name="MALM Desk",                category="Furniture",  price=149.99, shelf_id=2, shelf_level=1),
-            Product(name="LACK Coffee Table",        category="Furniture",  price=9.99,   shelf_id=2, shelf_level=2),
-            Product(name="LED Desk Lamp",            category="Lighting",   price=19.99,  shelf_id=3, shelf_level=3),
-            Product(name="TERTIAL Work Lamp",        category="Lighting",   price=12.99,  shelf_id=3, shelf_level=2),
-            Product(name="FEJKA Artificial Plant",   category="Decoration", price=5.99,   shelf_id=4, shelf_level=1),
-            Product(name="SMYCKA Artificial Flower",category="Decoration", price=3.99,   shelf_id=4, shelf_level=2),
-            Product(name="KORKEN Jar with lid",      category="Kitchen",    price=4.99,   shelf_id=5, shelf_level=1),
-            Product(name="VARDAGEN Casserole",       category="Kitchen",    price=29.99,  shelf_id=5, shelf_level=3),
-            Product(name="365+ Frying Pan",          category="Kitchen",    price=14.99,  shelf_id=6, shelf_level=2),
-            Product(name="DINERA Plate Set",         category="Kitchen",    price=24.99,  shelf_id=6, shelf_level=1),
-            Product(name="POÄNG Armchair",           category="Furniture",  price=99.99,  shelf_id=7, shelf_level=1),
-            Product(name="STRANDMON Wing Chair",     category="Furniture",  price=279.99, shelf_id=7, shelf_level=1),
-            Product(name="KIVIK Sofa Cover",         category="Textile",    price=89.99,  shelf_id=8, shelf_level=2),
-            Product(name="GURLI Throw",              category="Textile",    price=4.99,   shelf_id=8, shelf_level=3),
-            Product(name="RIBBA Frame 50x70",        category="Decoration", price=12.99,  shelf_id=9, shelf_level=1),
-            Product(name="SILVERHÖJDEN Frame",       category="Decoration", price=7.99,   shelf_id=9, shelf_level=2),
+        with open(SUPERMARKET_JSON, "r", encoding="utf-8") as f:
+            catalogue = json.load(f)
+
+        # ── Shelf layout: 3 rows × 5 columns = 15 shelves (one per category) ──
+        # Store is 12×10 m, entrance at y=0, shelves placed in a supermarket grid.
+        # Store is 12×5 m — 3 rows of 5 shelves, y compressed to fit
+        SHELF_DEFS = [
+            # (category_key,           display_name,            aisle, x,    y   )
+            ("dairy",                  "Dairy & Eggs",           "1",   1.5,  1.2),
+            ("juices",                 "Juices & Drinks",        "1",   4.0,  1.2),
+            ("bakery",                 "Bakery",                 "1",   6.5,  1.2),
+            ("meat_and_fish",          "Meat & Fish",            "1",   9.0,  1.2),
+            ("beverages",              "Beverages",              "1",  11.0,  1.2),
+            ("fruits",                 "Fresh Fruits",           "2",   1.5,  2.5),
+            ("vegetables",             "Fresh Vegetables",       "2",   4.0,  2.5),
+            ("snacks_and_chips",       "Snacks & Chips",         "2",   6.5,  2.5),
+            ("cereals_and_breakfast",  "Cereals & Breakfast",    "2",   9.0,  2.5),
+            ("frozen_foods",           "Frozen Foods",           "2",  11.0,  2.5),
+            ("canned_goods",           "Canned Goods",           "3",   1.5,  4.0),
+            ("condiments_and_sauces",  "Condiments & Sauces",    "3",   4.0,  4.0),
+            ("pasta_and_rice",         "Pasta & Rice",           "3",   6.5,  4.0),
+            ("personal_care",          "Personal Care",          "3",   9.0,  4.0),
+            ("cleaning_products",      "Cleaning Products",      "3",  11.0,  4.0),
         ]
+
+        # Price ranges per category (min, max) in €
+        PRICE_RANGES = {
+            "dairy":                 (0.99,  5.99),
+            "juices":                (1.29,  3.99),
+            "bakery":                (0.99,  5.99),
+            "meat_and_fish":         (3.99, 29.99),
+            "beverages":             (0.89, 15.99),
+            "fruits":                (0.49,  3.99),
+            "vegetables":            (0.39,  2.99),
+            "snacks_and_chips":      (0.99,  4.99),
+            "cereals_and_breakfast": (1.99,  6.99),
+            "frozen_foods":          (2.99,  8.99),
+            "canned_goods":          (0.79,  3.99),
+            "condiments_and_sauces": (1.49,  6.99),
+            "pasta_and_rice":        (0.99,  3.99),
+            "personal_care":         (1.99, 12.99),
+            "cleaning_products":     (1.99,  9.99),
+        }
+
+        def make_price(category_key: str, product_name: str) -> float:
+            lo, hi = PRICE_RANGES.get(category_key, (0.99, 9.99))
+            # Deterministic pseudo-random price from product name hash
+            t = (hash(product_name) & 0xFFFF) / 0xFFFF
+            return round(lo + t * (hi - lo), 2)
+
+        # ── Insert shelves ──
+        shelves = []
+        for cat_key, display_name, aisle, x, y in SHELF_DEFS:
+            shelves.append(Shelf(
+                name=display_name, aisle=aisle,
+                x=x, y=y, width=1.2, height=0.5,
+            ))
+        db.add_all(shelves)
+        await db.flush()  # assign IDs
+
+        # ── Insert products ──
+        products = []
+        for shelf_obj, (cat_key, display_name, *_) in zip(shelves, SHELF_DEFS):
+            items = catalogue.get(cat_key, [])
+            for idx, item_name in enumerate(items):
+                products.append(Product(
+                    name=item_name,
+                    category=display_name,
+                    price=make_price(cat_key, item_name),
+                    shelf_id=shelf_obj.id,
+                    shelf_level=(idx % 4) + 1,  # cycle levels 1-4
+                ))
         db.add_all(products)
         await db.commit()
-        logger.info("Seeded %d shelves and %d products", len(shelves), len(products))
+        logger.info("Seeded %d shelves and %d products from supermarket.json",
+                    len(shelves), len(products))
 
 
 async def _register_shelf_obstacles():

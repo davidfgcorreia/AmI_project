@@ -1,5 +1,5 @@
 /**
- * useIMU – streams device motion / orientation via the DeviceMotion API.
+ * useIMU - streams device motion / orientation via the DeviceMotion API.
  * Sends updates to the WebSocket tracking service.
  */
 import { useEffect, useRef, useCallback } from 'react';

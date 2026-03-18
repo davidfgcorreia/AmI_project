@@ -12,9 +12,19 @@
   --danger: #ea4335;
   --radius: 12px;
   --shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+  /* Safe area insets for notch / home indicator */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  /* Prevent elastic scroll flicker on iOS */
+  height: -webkit-fill-available;
+}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -22,6 +32,15 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  /* Prevent text selection during touch gestures */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Allow selection inside inputs/text nodes */
+}
+
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 a { color: var(--primary); text-decoration: none; }
@@ -32,10 +51,22 @@ button {
   border-radius: var(--radius);
   font-weight: 600;
   font-size: 0.95rem;
+  /* Minimum touch target 44px */
+  min-height: 44px;
   padding: 0.65rem 1.25rem;
   transition: background .15s, transform .1s;
+  /* Prevent iOS button styling */
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
 }
-button:active { transform: scale(0.97); }
+button:active { transform: scale(0.96); }
+
+/* Remove hover effects on touch devices */
+@media (hover: none) {
+  button:hover { background: inherit; }
+  .btn-primary:hover { background: var(--primary); }
+}
 
 .btn-primary {
   background: var(--primary);
@@ -67,11 +98,17 @@ button:active { transform: scale(0.97); }
 input, select {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.6rem 0.9rem;
-  font-size: 0.95rem;
+  padding: 0.75rem 1rem;
+  /* 16px prevents iOS auto-zoom on focus */
+  font-size: 16px;
   width: 100%;
   outline: none;
   transition: border-color .15s;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
+  min-height: 44px;
+  background: var(--surface);
 }
 input:focus, select:focus { border-color: var(--primary); }
 
@@ -86,24 +123,34 @@ input:focus, select:focus { border-color: var(--primary); }
 .app-shell {
   display: flex;
   flex-direction: column;
+  /* Use dvh with fallback for older Safari */
+  height: 100vh;
   height: 100dvh;
 }
 
 .app-header {
   background: var(--primary);
   color: #fff;
-  padding: 0.75rem 1rem;
+  /* Top padding accounts for transparent status bar (iOS black-translucent) */
+  padding-top: calc(0.75rem + var(--safe-top));
+  padding-bottom: 0.75rem;
+  padding-left: calc(1rem + var(--safe-left));
+  padding-right: calc(1rem + var(--safe-right));
   display: flex;
   align-items: center;
   gap: 0.75rem;
   z-index: 100;
+  flex-shrink: 0;
 }
 .app-header h1 { font-size: 1.1rem; font-weight: 700; }
 
 .app-body {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 1rem;
+  padding-left: calc(1rem + var(--safe-left));
+  padding-right: calc(1rem + var(--safe-right));
 }
 
 .app-nav {
@@ -112,6 +159,9 @@ input:focus, select:focus { border-color: var(--primary); }
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 0.5rem 0;
+  /* Push above home indicator */
+  padding-bottom: calc(0.5rem + var(--safe-bottom));
+  flex-shrink: 0;
 }
 .app-nav button {
   background: none;
@@ -121,7 +171,10 @@ input:focus, select:focus { border-color: var(--primary); }
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 0.25rem 0.75rem;
+  padding: 0.4rem 1rem;
+  min-height: 52px;
+  flex: 1;
+  border-radius: 0;
 }
 .app-nav button.active { color: var(--primary); }
 .app-nav button svg { width: 24px; height: 24px; }
@@ -131,6 +184,7 @@ input:focus, select:focus { border-color: var(--primary); }
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1rem;
+  align-items: center;
 }
 .search-bar input { flex: 1; }
 
@@ -145,6 +199,14 @@ input:focus, select:focus { border-color: var(--primary); }
   align-items: center;
   gap: 0.75rem;
   padding: 0.85rem;
+  /* Ensure minimum tap height */
+  min-height: 72px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.product-card:active {
+  background: #f8f9fa;
+  transform: scale(0.99);
 }
 .product-card .product-icon {
   width: 48px;
@@ -155,11 +217,12 @@ input:focus, select:focus { border-color: var(--primary); }
   align-items: center;
   justify-content: center;
   font-size: 1.4rem;
+  flex-shrink: 0;
 }
-.product-card .product-info { flex: 1; }
-.product-card .product-info h3 { font-size: 0.95rem; }
+.product-card .product-info { flex: 1; min-width: 0; }
+.product-card .product-info h3 { font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .product-card .product-info p { font-size: 0.8rem; color: var(--text-secondary); }
-.product-card .product-price { font-weight: 700; color: var(--primary); }
+.product-card .product-price { font-weight: 700; color: var(--primary); flex-shrink: 0; }
 
 /* ── Map canvas ── */
 .map-container {
@@ -193,26 +256,29 @@ input:focus, select:focus { border-color: var(--primary); }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 10px;
+  padding: 4px 10px;
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 .status-badge.connected { background: #e6f4ea; color: var(--success); }
 .status-badge.disconnected { background: #fce8e6; color: var(--danger); }
 
 /* ── Voice button ── */
 .voice-btn {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: var(--primary);
   color: #fff;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(26,115,232,.4);
+  flex-shrink: 0;
+  padding: 0;
 }
 .voice-btn.listening {
   animation: pulse 1.2s infinite;
@@ -224,7 +290,170 @@ input:focus, select:focus { border-color: var(--primary); }
   100% { box-shadow: 0 0 0 0 rgba(234,67,53,0); }
 }
 
-/* ── Responsive ── */
+/* Remove default tap highlight on all interactive elements */
+a, button, input, select, label {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Next stop card (map tab) ── */
+.next-stop {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+.next-stop-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  margin-bottom: 0.4rem;
+}
+.next-stop-body {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.next-stop-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.next-stop-name {
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.next-stop-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.next-stop-remaining {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+/* ── Nav queue badge ── */
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+.app-nav button { position: relative; }
+
+/* ── Nav queue card ── */
+.nav-queue {
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+}
+
+.nav-queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.nav-queue-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.nav-queue-count {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.nav-queue-clear {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.65rem;
+  min-height: unset;
+}
+
+.nav-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nav-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: var(--bg);
+  transition: background .15s;
+}
+
+.nav-queue-item.current {
+  background: #e8f0fe;
+  border-left: 3px solid var(--primary);
+}
+
+.nav-queue-item.collected {
+  opacity: 0.45;
+}
+
+.nav-queue-num {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  min-width: 20px;
+  text-align: center;
+}
+
+.nav-queue-item.current .nav-queue-num {
+  color: var(--primary);
+}
+
+.nav-queue-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-queue-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-queue-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.nav-queue-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.nav-queue-btn {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  min-height: 36px;
+}
+
+/* ── Responsive (tablet / desktop) ── */
 @media (min-width: 768px) {
   .app-body { max-width: 900px; margin: 0 auto; }
   .map-container { height: 65dvh; }

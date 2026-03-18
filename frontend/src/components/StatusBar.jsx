@@ -1,5 +1,5 @@
 /**
- * StatusBar – shows connection status + accuracy badge.
+ * StatusBar - shows connection status + accuracy badge.
  */
 import React from 'react';
 

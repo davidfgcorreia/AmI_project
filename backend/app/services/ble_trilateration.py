@@ -56,7 +56,7 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
     Parameters
     ----------
     readings : dict
-        {gateway_id: rssi_value}  – requires ≥ 3 gateways.
+        {gateway_id: rssi_value}  - requires ≥ 3 gateways.
 
     Returns
     -------
@@ -78,7 +78,7 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
         weights.append(max(0.05, 10 ** ((rssi - BLE_TX_POWER) / 20)))
 
     if len(gateways) < 3:
-        logger.warning("[BLE-TRI] ⚠ Only %d known gateways (need ≥3) – skip", len(gateways))
+        logger.warning("[BLE-TRI] ⚠ Only %d known gateways (need ≥3) - skip", len(gateways))
         return None
 
     # Initial guess: centroid of gateways

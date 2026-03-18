@@ -1,5 +1,5 @@
 /**
- * useVoiceSearch – Web Speech API integration for hands-free product search.
+ * useVoiceSearch - Web Speech API integration for hands-free product search.
  */
 import { useState, useCallback, useRef } from 'react';
 

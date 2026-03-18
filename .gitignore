@@ -15,7 +15,7 @@ env/
 
 # ── Backend ──
 backend/venv/
-backend/store.db
+backend/app/store.db
 backend/yolov8*.pt
 backend/app/static/shelf_images/*
 !backend/app/static/shelf_images/.gitkeep
@@ -27,6 +27,8 @@ frontend/dist/
 frontend/.vite/
 frontend/package-lock.json
 frontend/yarn.lock
+frontend/.env.production
+frontend/android/
 
 # ── IDE / Editor ──
 .vscode/

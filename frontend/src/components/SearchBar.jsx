@@ -1,5 +1,5 @@
 /**
- * SearchBar – text + voice search for products.
+ * SearchBar - text + voice search for products.
  */
 import React, { useState, useCallback } from 'react';
 import useVoiceSearch from '../hooks/useVoiceSearch';
@@ -23,12 +23,12 @@ export default function SearchBar({ onSearch }) {
     <form className="search-bar" onSubmit={handleSubmit}>
       <input
         type="text"
-        placeholder="Search products… e.g. 'coffee table'"
+        placeholder="Search products…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Search products"
       />
-      <button type="submit" className="btn-primary" aria-label="Search">
+      <button type="submit" className="btn-primary btn-icon" aria-label="Search">
         🔍
       </button>
       <button
