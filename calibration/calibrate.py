@@ -348,9 +348,9 @@ def main():
     surv_p.add_argument("--session", required=True, help="BLE session ID")
     surv_p.add_argument("--backend", default=BACKEND_HTTP)
 
+    global BACKEND_HTTP, BACKEND_WS
     args = parser.parse_args()
 
-    global BACKEND_HTTP, BACKEND_WS
     if hasattr(args, "backend"):
         BACKEND_HTTP = args.backend
         BACKEND_WS   = args.backend.replace("http", "ws")
