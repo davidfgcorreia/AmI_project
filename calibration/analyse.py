@@ -159,15 +159,20 @@ def analyse_distance(files: list[Path]):
         # But near-field is a different steeper slope so clamp to ≤1
         d_at_minus50 = max(0.1, 1.0 - (rec_tx - (-50.0)) / max(rec_far, 0.5))
 
+        W = 54  # inner width between ║ borders
+        def row(label, value, note):
+            content = f"  {label} = {value}  ({note})"
+            return f"  ║{content.ljust(W)}║"
+
         print("\n")
-        print("  ╔══════════════════════════════════════════════════════╗")
-        print("  ║   Suggested values for backend/app/core/config.py   ║")
-        print("  ╠══════════════════════════════════════════════════════╣")
-        print(f"  ║  BLE_TX_POWER         = {rec_tx:+.1f}  (was -70)            ║")
-        print(f"  ║  BLE_FAR_DBM_PER_M    = {rec_far:.2f}  (was 5.0)            ║")
-        print(f"  ║  BLE_NEAR_RSSI        = {rec_near_rssi:+.1f}  (was -70)            ║")
-        print(f"  ║  BLE_NEAR_DIST_AT_REF = {d_at_minus50:.2f}  (was 0.5)             ║")
-        print("  ╚══════════════════════════════════════════════════════╝")
+        print("  ╔" + "═" * W + "╗")
+        print(f"  ║{'  Suggested values for backend/app/core/config.py'.ljust(W)}║")
+        print("  ╠" + "═" * W + "╣")
+        print(row("BLE_TX_POWER        ", f"{rec_tx:+.1f}",      f"was -70"))
+        print(row("BLE_FAR_DBM_PER_M   ", f"{rec_far:.2f}",      f"was 5.0"))
+        print(row("BLE_NEAR_RSSI       ", f"{rec_near_rssi:+.1f}",f"was -70"))
+        print(row("BLE_NEAR_DIST_AT_REF", f"{d_at_minus50:.2f}", f"was 0.5"))
+        print("  ╚" + "═" * W + "╝")
         print()
         print("  Paste these into config.py and restart the backend.")
         print("  Then run  python calibrate.py survey  to verify accuracy.")
@@ -213,13 +218,6 @@ def analyse_survey(path: Path, show_plot: bool = False):
 
 def _ascii_heatmap(by_point: dict):
     """Draw a coarse ASCII map of error magnitude across the room."""
-    try:
-        from backend_config import STORE_WIDTH, STORE_HEIGHT
-    except ImportError:
-        # Reasonable defaults if can't import
-        STORE_WIDTH, STORE_HEIGHT = 12.0, 5.0
-
-    # Try to read from config directly
     try:
         import sys, importlib
         sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))

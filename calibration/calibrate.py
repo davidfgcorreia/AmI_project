@@ -33,6 +33,7 @@ import argparse
 import asyncio
 import csv
 import json
+import math
 import statistics
 import sys
 import time
@@ -101,7 +102,6 @@ async def record_samples(session_id: str, gateway_id: str, secs: int) -> list[fl
     """Collect raw RSSI samples from one gateway for *secs* seconds."""
     samples: list[float] = []
     end = time.monotonic() + secs
-    dots = 0
     while time.monotonic() < end:
         buf = await fetch_buffer(session_id)
         val = buf.get(gateway_id)
@@ -116,7 +116,7 @@ async def record_samples(session_id: str, gateway_id: str, secs: int) -> list[fl
 
 # ── Distance calibration ────────────────────────────────────────────────────
 
-async def run_distance(gateway_id: str, session_id: str):
+async def run_distance(gateway_id: str, session_id: str, duration: int = RECORD_SECS):
     banner(f"Distance calibration — {gateway_id}")
     info(f"Session ID : {session_id}")
     info(f"Backend    : {BACKEND_HTTP}")
@@ -152,7 +152,7 @@ async def run_distance(gateway_id: str, session_id: str):
         info(f"  Next distance: {dist} m from {gateway_id}")
         prompt(f"Stand {dist} m away, then press ENTER to start recording")
 
-        samples = await record_samples(session_id, gateway_id, RECORD_SECS)
+        samples = await record_samples(session_id, gateway_id, duration)
         if len(samples) < 5:
             info(f"  ✗  Too few samples ({len(samples)}). Skipping this distance.")
             continue
@@ -283,7 +283,6 @@ async def run_survey(session_id: str):
         est_y  = statistics.mean(est_ys)
         acc    = statistics.mean(e[2] for e in estimates)
 
-        import math
         error = math.sqrt((est_x - actual_x)**2 + (est_y - actual_y)**2)
 
         info(f"  Actual:    ({actual_x:.2f}, {actual_y:.2f})")
@@ -320,7 +319,6 @@ async def run_survey(session_id: str):
         writer.writeheader()
         writer.writerows(rows)
 
-    import math
     errors = [r["error_m"] for r in rows]
     info(f"\n  ✔  Saved {len(rows)} rows → {path}")
     info(f"  Mean error : {statistics.mean(errors):.2f} m")
@@ -332,6 +330,7 @@ async def run_survey(session_id: str):
 # ── Entry point ─────────────────────────────────────────────────────────────
 
 def main():
+    global BACKEND_HTTP, BACKEND_WS
     parser = argparse.ArgumentParser(
         description="IRE calibration data collector",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -348,7 +347,6 @@ def main():
     surv_p.add_argument("--session", required=True, help="BLE session ID")
     surv_p.add_argument("--backend", default=BACKEND_HTTP)
 
-    global BACKEND_HTTP, BACKEND_WS
     args = parser.parse_args()
 
     if hasattr(args, "backend"):
@@ -357,7 +355,7 @@ def main():
 
     try:
         if args.mode == "distance":
-            asyncio.run(run_distance(args.gateway, args.session))
+            asyncio.run(run_distance(args.gateway, args.session, args.duration))
         elif args.mode == "survey":
             asyncio.run(run_survey(args.session))
     except KeyboardInterrupt:
