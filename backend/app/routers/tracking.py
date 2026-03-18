@@ -45,25 +45,25 @@ async def tracking_ws(ws: WebSocket, session_id: str):
     csv_log = get_csv_logger(session_id)
     logger.info("[WS] Connected: session=%s", session_id)
 
-    async def recv_loop():
-        """Feed IMU messages into the PDR predictor."""
+    try:
         while True:
-            raw = await ws.receive_text()
+            # Wait up to PUSH_INTERVAL for an IMU message; timeout just means
+            # no motion data this tick — we still push the latest BLE position.
             try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            if data.get("type") == "imu":
-                heading = float(data.get("heading", 0.0))
-                steps   = int(data.get("steps", 0))
-                tracker.predict_pdr(heading, steps, dt=0.2)
-                csv_log.record_imu(heading, steps)
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=PUSH_INTERVAL)
+                try:
+                    data = json.loads(raw)
+                except json.JSONDecodeError:
+                    data = {}
+                if data.get("type") == "imu":
+                    heading = float(data.get("heading", 0.0))
+                    steps   = int(data.get("steps", 0))
+                    tracker.predict_pdr(heading, steps, dt=0.2)
+                    csv_log.record_imu(heading, steps)
+            except asyncio.TimeoutError:
+                pass  # no IMU this tick — fall through to BLE check and push
 
-    async def push_loop():
-        """At 10 Hz: grab fresh BLE readings, trilaterate, update Kalman, push."""
-        while True:
-            await asyncio.sleep(PUSH_INTERVAL)
-
+            # Trilaterate from fresh BLE readings (if available)
             readings = get_fresh_readings(session_id)
             if readings:
                 csv_log.record_ble(readings)
@@ -75,9 +75,8 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 else:
                     csv_log.record_trilateration(None, None)
 
-            x, y    = tracker.position
+            x, y     = tracker.position
             accuracy = round(tracker.accuracy, 2)
-            # Guard: NaN/inf in position would crash json.dumps and kill the task
             if not (math.isfinite(x) and math.isfinite(y)):
                 continue
             csv_log.record_fused(x, y, accuracy)
@@ -88,33 +87,15 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 "accuracy": accuracy,
             })
 
-    recv_task = asyncio.create_task(recv_loop())
-    push_task = asyncio.create_task(push_loop())
-    try:
-        done, pending = await asyncio.wait(
-            {recv_task, push_task},
-            return_when=asyncio.FIRST_EXCEPTION,
-        )
-        for task in pending:
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
-        # Propagate the first real exception (WebSocketDisconnect is normal)
-        for task in done:
-            exc = task.exception()
-            if exc and not isinstance(exc, WebSocketDisconnect):
-                logger.error("[WS] Error session=%s: %s", session_id, exc)
+    except WebSocketDisconnect:
+        logger.info("[WS] Disconnected: session=%s", session_id)
     except Exception as exc:
-        logger.error("[WS] Outer error session=%s: %s", session_id, exc)
+        logger.error("[WS] Error session=%s: %s", session_id, exc)
     finally:
-        recv_task.cancel()
-        push_task.cancel()
         _connections.pop(session_id, None)
         close_csv_logger(session_id, instance=csv_log)
         remove_tracker(session_id)
-        logger.info("[WS] Disconnected: session=%s", session_id)
+        logger.info("[WS] Cleaned up session=%s", session_id)
 
 
 # ── REST endpoints ──────────────────────────────────────────────────────────────
