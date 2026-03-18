@@ -1,13 +1,15 @@
 """
 WebSocket endpoint for real-time position tracking.
 
-Architecture:
-  • recv_loop  — processes IMU messages as they arrive (PDR predict)
-  • push_loop  — runs at 10 Hz regardless of IMU; reads fresh BLE data,
-                 trilaterates, updates Kalman, and pushes position to client
-  This decoupling means position updates are never gated on IMU ticks,
-  eliminating the ~30 s startup delay caused by waiting for all gateways
-  to appear in the buffer before the first IMU message arrives.
+BLE-only mode: position = EMA-smoothed trilateration, no Kalman / IMU.
+
+Two-task architecture with a shared stop_event:
+  recv_loop  — drains incoming frames so the WS stays healthy; sets stop_event on disconnect.
+  push_loop  — at 10 Hz pulls fresh BLE data, trilaterates, smooths, pushes position.
+
+Critically: recv_loop is NEVER cancelled mid-flight.  Cancelling
+ws.receive_text() via asyncio.wait_for corrupts Starlette's internal WS
+state and causes the connection to silently die.
 """
 import asyncio
 import json
@@ -17,7 +19,6 @@ import math
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..services.ble_trilateration import trilaterate
-from ..services.kalman_fusion import get_tracker, remove_tracker
 from ..services.mqtt_client import get_ble_buffer, get_fresh_readings, update_ble_reading
 from ..services.csv_logger import get_csv_logger, close_csv_logger
 from ..services.ble_logger import log_ble_reading, read_recent
@@ -29,7 +30,8 @@ logger = logging.getLogger("ws")
 
 _connections: dict[str, WebSocket] = {}
 
-PUSH_INTERVAL = 0.1   # seconds — position pushed to client at up to 10 Hz
+PUSH_INTERVAL = 0.1   # seconds  →  10 Hz push rate
+POS_ALPHA     = 0.6   # EMA factor: 1=instant/noisy  0=never moves
 
 
 def get_connections():
@@ -41,61 +43,89 @@ async def tracking_ws(ws: WebSocket, session_id: str):
     await ws.accept()
     _connections[session_id] = ws
     session_manager.create_or_update(session_id)
-    tracker = get_tracker(session_id)
-    csv_log = get_csv_logger(session_id)
-    logger.info("[WS] Connected: session=%s", session_id)
+    csv_log  = get_csv_logger(session_id)
+    logger.info("[WS] Connected  session=%s", session_id)
 
-    try:
-        while True:
-            # Wait up to PUSH_INTERVAL for an IMU message; timeout just means
-            # no motion data this tick — we still push the latest BLE position.
-            try:
-                raw = await asyncio.wait_for(ws.receive_text(), timeout=PUSH_INTERVAL)
+    # Smoothed position state (EMA, BLE-only)
+    pos_x: float | None = None
+    pos_y: float | None = None
+
+    stop_event = asyncio.Event()
+
+    # ── recv loop: keep connection healthy, detect client disconnect ──────────
+    async def recv_loop():
+        nonlocal pos_x, pos_y
+        try:
+            async for raw in ws.iter_text():
                 try:
                     data = json.loads(raw)
                 except json.JSONDecodeError:
-                    data = {}
+                    continue
+                # Accept IMU data if the phone ever starts sending it
                 if data.get("type") == "imu":
-                    heading = float(data.get("heading", 0.0))
-                    steps   = int(data.get("steps", 0))
-                    tracker.predict_pdr(heading, steps, dt=0.2)
-                    csv_log.record_imu(heading, steps)
-            except asyncio.TimeoutError:
-                pass  # no IMU this tick — fall through to BLE check and push
+                    csv_log.record_imu(
+                        float(data.get("heading", 0.0)),
+                        int(data.get("steps", 0)),
+                    )
+        except WebSocketDisconnect:
+            pass
+        except Exception as exc:
+            logger.debug("[WS] recv_loop exception session=%s: %s", session_id, exc)
+        finally:
+            stop_event.set()
 
-            # Trilaterate from fresh BLE readings (if available)
-            readings = get_fresh_readings(session_id)
-            if readings:
-                csv_log.record_ble(readings)
-                log_ble_reading(session_id, readings)
-                pos = trilaterate(readings)
-                if pos:
-                    csv_log.record_trilateration(*pos)
-                    tracker.update_ble(*pos, best_rssi=max(readings.values()))
-                else:
-                    csv_log.record_trilateration(None, None)
+    # ── push loop: trilaterate + smooth + push at 10 Hz ──────────────────────
+    async def push_loop():
+        nonlocal pos_x, pos_y
+        try:
+            while not stop_event.is_set():
+                await asyncio.sleep(PUSH_INTERVAL)
+                if stop_event.is_set():
+                    break
 
-            x, y     = tracker.position
-            accuracy = round(tracker.accuracy, 2)
-            if not (math.isfinite(x) and math.isfinite(y)):
-                continue
-            csv_log.record_fused(x, y, accuracy)
-            await ws.send_json({
-                "type": "position",
-                "x": round(x, 2),
-                "y": round(y, 2),
-                "accuracy": accuracy,
-            })
+                readings = get_fresh_readings(session_id)
+                if readings:
+                    csv_log.record_ble(readings)
+                    log_ble_reading(session_id, readings)
+                    pos = trilaterate(readings)
+                    if pos and math.isfinite(pos[0]) and math.isfinite(pos[1]):
+                        csv_log.record_trilateration(*pos)
+                        if pos_x is None:
+                            pos_x, pos_y = pos
+                        else:
+                            pos_x = POS_ALPHA * pos[0] + (1 - POS_ALPHA) * pos_x
+                            pos_y = POS_ALPHA * pos[1] + (1 - POS_ALPHA) * pos_y
 
-    except WebSocketDisconnect:
-        logger.info("[WS] Disconnected: session=%s", session_id)
-    except Exception as exc:
-        logger.error("[WS] Error session=%s: %s", session_id, exc)
-    finally:
-        _connections.pop(session_id, None)
-        close_csv_logger(session_id, instance=csv_log)
-        remove_tracker(session_id)
-        logger.info("[WS] Cleaned up session=%s", session_id)
+                if pos_x is None:
+                    continue  # no position yet — don't send
+
+                csv_log.record_fused(pos_x, pos_y, 0.0)
+                await ws.send_json({
+                    "type":     "position",
+                    "x":        round(pos_x, 2),
+                    "y":        round(pos_y, 2),
+                    "accuracy": 1.0,
+                })
+        except WebSocketDisconnect:
+            pass
+        except Exception as exc:
+            logger.debug("[WS] push_loop exception session=%s: %s", session_id, exc)
+        finally:
+            stop_event.set()
+
+    recv_task = asyncio.create_task(recv_loop())
+    push_task = asyncio.create_task(push_loop())
+
+    # Wait until either task signals stop (disconnect or send error)
+    await stop_event.wait()
+
+    recv_task.cancel()
+    push_task.cancel()
+    await asyncio.gather(recv_task, push_task, return_exceptions=True)
+
+    _connections.pop(session_id, None)
+    close_csv_logger(session_id, instance=csv_log)
+    logger.info("[WS] Cleaned up  session=%s", session_id)
 
 
 # ── REST endpoints ──────────────────────────────────────────────────────────────
@@ -123,23 +153,20 @@ async def post_ble_reading(reading: BLEReading):
     logger.info("[BLE] gw=%s  session=%s  rssi=%+.1f dBm",
                 reading.gateway_id, reading.session_id, reading.rssi)
 
-    # If 3 fresh readings exist and a WebSocket is open, push immediately
-    # (supplements the push_loop for very fast ESP32 HTTP posting)
+    # Immediately push updated position to any connected WebSocket
     readings = get_fresh_readings(reading.session_id)
     if readings:
         log_ble_reading(reading.session_id, readings)
         ws = _connections.get(reading.session_id)
         if ws:
             pos = trilaterate(readings)
-            if pos:
-                tracker = get_tracker(reading.session_id)
-                tracker.update_ble(*pos, best_rssi=max(readings.values()))
+            if pos and math.isfinite(pos[0]) and math.isfinite(pos[1]):
                 try:
                     await ws.send_json({
-                        "type": "position",
-                        "x": round(tracker.position[0], 2),
-                        "y": round(tracker.position[1], 2),
-                        "accuracy": round(tracker.accuracy, 2),
+                        "type":     "position",
+                        "x":        round(pos[0], 2),
+                        "y":        round(pos[1], 2),
+                        "accuracy": 1.0,
                     })
                 except Exception:
                     pass
