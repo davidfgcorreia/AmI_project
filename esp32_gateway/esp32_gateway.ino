@@ -32,7 +32,7 @@
 #define MQTT_HOST    "192.168.0.102"    // Backend server IP
 #define MQTT_PORT    1883
 #define MQTT_TOPIC   "ire/ble/rssi"
-#define SCAN_TIME    2                  // BLE scan duration (seconds)
+#define SCAN_TIME    1                  // BLE scan duration (seconds)
 
 // IRE app service UUID – only report devices advertising this UUID
 #define IRE_SERVICE_UUID "6e400001-b5a3-f393-e0a9-e50e24dcca9e"

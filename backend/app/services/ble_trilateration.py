@@ -45,9 +45,18 @@ def _residuals(point, gateways, distances, weights):
     ])
 
 
-def trilaterate(readings: dict[str, float]) -> tuple[float, float, float] | None:
+_AGE_DECAY_TAU = 2.5  # seconds; weight halves ~every 1.7 s of staleness
+
+
+def trilaterate(
+    readings: dict[str, float],
+    ages: dict[str, float] | None = None,
+) -> tuple[float, float, float] | None:
     """
     Trilaterate user position from BLE RSSI readings (≥ 3 gateways).
+
+    ages: optional {gateway_id: seconds_since_last_reading}.
+          Fresher readings get higher weight via exponential decay.
 
     Returns (x, y, accuracy_m) clamped to store bounds, or None on failure.
     accuracy_m is the RMS of unweighted distance residuals — a rough estimate
@@ -61,9 +70,12 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float, float] | None
             continue
         gateways.append(pos)
         distances.append(rssi_to_distance(rssi))
-        # Amplitude ratio relative to 1-m reference.
-        # Stronger signal → higher weight (can only be attenuated, not amplified).
-        weights.append(max(0.05, 10 ** ((rssi - BLE_TX_POWER) / 20)))
+        # Amplitude ratio: stronger signal → higher weight.
+        signal_w = max(0.05, 10 ** ((rssi - BLE_TX_POWER) / 20))
+        # Time decay: penalise stale readings exponentially.
+        age = ages.get(gw_id, 0.0) if ages else 0.0
+        time_w = math.exp(-age / _AGE_DECAY_TAU)
+        weights.append(signal_w * time_w)
 
     if len(gateways) < 3:
         return None

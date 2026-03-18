@@ -88,11 +88,12 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 if stop_event.is_set():
                     break
 
-                readings = get_fresh_readings(session_id)
-                if readings:
+                fresh = get_fresh_readings(session_id)
+                if fresh:
+                    readings, ages = fresh
                     csv_log.record_ble(readings)
                     log_ble_reading(session_id, readings)
-                    result = trilaterate(readings)
+                    result = trilaterate(readings, ages)
                     if result:
                         new_x, new_y, accuracy = result
                         csv_log.record_trilateration(new_x, new_y)
@@ -166,12 +167,13 @@ async def post_ble_reading(reading: BLEReading):
                 reading.gateway_id, reading.session_id, reading.rssi)
 
     # Immediately push updated position to any connected WebSocket
-    readings = get_fresh_readings(reading.session_id)
-    if readings:
+    fresh = get_fresh_readings(reading.session_id)
+    if fresh:
+        readings, ages = fresh
         log_ble_reading(reading.session_id, readings)
         ws = _connections.get(reading.session_id)
         if ws:
-            result = trilaterate(readings)
+            result = trilaterate(readings, ages)
             if result:
                 rx, ry, racc = result
                 try:

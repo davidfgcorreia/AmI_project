@@ -25,7 +25,7 @@ _ble_timestamps: dict[str, dict[str, float]] = {}
 _EMA_ALPHA = 0.65
 
 # Readings older than this are ignored for trilateration.
-_MAX_AGE_S = 8.0
+_MAX_AGE_S = 4.0
 
 
 def get_ble_buffer() -> dict[str, dict[str, float]]:
@@ -51,10 +51,13 @@ def update_ble_reading(session_id: str, gateway_id: str, rssi: float):
     session_manager.create_or_update(session_id)
 
 
-def get_fresh_readings(session_id: str, max_age: float = _MAX_AGE_S) -> dict[str, float] | None:
+def get_fresh_readings(
+    session_id: str, max_age: float = _MAX_AGE_S
+) -> tuple[dict[str, float], dict[str, float]] | None:
     """
-    Return {gateway_id: rssi} for gateways whose last reading arrived
-    within *max_age* seconds.  Returns None if fewer than 3 are fresh.
+    Return ({gateway_id: rssi}, {gateway_id: age_seconds}) for gateways
+    whose last reading arrived within *max_age* seconds.
+    Returns None if fewer than 3 are fresh.
     """
     buf = _ble_buffer.get(session_id)
     ts  = _ble_timestamps.get(session_id)
@@ -62,7 +65,10 @@ def get_fresh_readings(session_id: str, max_age: float = _MAX_AGE_S) -> dict[str
         return None
     now = time.monotonic()
     fresh = {gw: rssi for gw, rssi in buf.items() if now - ts.get(gw, 0) <= max_age}
-    return fresh if len(fresh) >= 3 else None
+    if len(fresh) < 3:
+        return None
+    ages = {gw: now - ts[gw] for gw in fresh}
+    return fresh, ages
 
 
 async def mqtt_listener():
