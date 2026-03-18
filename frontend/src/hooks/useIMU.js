@@ -36,7 +36,18 @@ export default function useIMU(active = true) {
   useEffect(() => {
     if (!active) return;
 
-    // Request permission (iOS 13+)
+    // ── Native Android bridge ──────────────────────────────────────────────
+    // When running inside the Android app the ImuManager injects CustomEvents
+    // instead of firing DeviceMotion/DeviceOrientation (which are unreliable
+    // inside a WebView).  We listen for those and forward straight to the WS.
+    const handleNativeImu = (e) => {
+      const { heading, steps, dt } = e.detail;
+      headingRef.current = heading;
+      stepsRef.current  += steps;
+    };
+    window.addEventListener('nativeImu', handleNativeImu);
+
+    // ── Browser / PWA fallback ─────────────────────────────────────────────
     if (typeof DeviceMotionEvent !== 'undefined' &&
         typeof DeviceMotionEvent.requestPermission === 'function') {
       DeviceMotionEvent.requestPermission().catch(() => {});
@@ -49,16 +60,17 @@ export default function useIMU(active = true) {
     window.addEventListener('devicemotion', handleMotion);
     window.addEventListener('deviceorientation', handleOrientation);
 
-    // Send IMU data at ~5 Hz
+    // Send IMU data at ~5 Hz regardless of source
     intervalRef.current = setInterval(() => {
       sendIMU({
         heading: headingRef.current,
         steps: stepsRef.current,
       });
-      stepsRef.current = 0;   // reset per interval
+      stepsRef.current = 0;
     }, 200);
 
     return () => {
+      window.removeEventListener('nativeImu', handleNativeImu);
       window.removeEventListener('devicemotion', handleMotion);
       window.removeEventListener('deviceorientation', handleOrientation);
       clearInterval(intervalRef.current);

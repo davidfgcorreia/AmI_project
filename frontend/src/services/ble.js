@@ -13,6 +13,23 @@ const STORAGE_KEY = 'ire_session_id';
  * Generated once and persisted in localStorage.
  */
 export async function getOrCreateSessionId() {
+  // 1. Android app passes the native session ID as ?session= in the URL
+  const urlParam = new URLSearchParams(window.location.search).get('session');
+  if (urlParam) {
+    localStorage.setItem(STORAGE_KEY, urlParam);
+    return urlParam;
+  }
+
+  // 2. AndroidBridge fallback (in case the URL param is lost on navigation)
+  if (window.AndroidBridge) {
+    const nativeId = window.AndroidBridge.getSessionId();
+    if (nativeId) {
+      localStorage.setItem(STORAGE_KEY, nativeId);
+      return nativeId;
+    }
+  }
+
+  // 3. Browser / PWA: use localStorage, generate once
   let sessionId = localStorage.getItem(STORAGE_KEY);
   if (!sessionId) {
     sessionId = 'IRE-' + Math.random().toString(36).slice(2, 10).toUpperCase();

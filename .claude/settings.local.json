@@ -7,7 +7,9 @@
       "Bash(ls /mnt/c/Users/pitne/Documents/ist/2526/p3/AInt/AmI_project/*.sh /mnt/c/Users/pitne/Documents/ist/2526/p3/AInt/AmI_project/*.ps1 2>/dev/null)",
       "Bash(python3 -c \"\nimport sqlite3\nconn = sqlite3.connect\\('backend/app/store.db'\\)\ncur = conn.cursor\\(\\)\ncur.execute\\('SELECT COUNT\\(*\\) FROM products'\\)\nprint\\('Products:', cur.fetchone\\(\\)[0]\\)\ncur.execute\\('SELECT COUNT\\(*\\) FROM shelves'\\)\nprint\\('Shelves:', cur.fetchone\\(\\)[0]\\)\ncur.execute\\('SELECT name FROM products LIMIT 5'\\)\nprint\\('Sample:', cur.fetchall\\(\\)\\)\nconn.close\\(\\)\n\")",
       "Bash(python3 -m py_compile calibrate.py)",
-      "Bash(python3 -m py_compile analyse.py)"
+      "Bash(python3 -m py_compile analyse.py)",
+      "Bash(find /home/goncalo/Documents/IST/p3/AI/AmI_project -name *.kts -o -name *.kt -o -name AndroidManifest.xml)",
+      "Bash(xargs ls:*)"
     ]
   }
 }
