@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import math
+import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -30,8 +31,9 @@ logger = logging.getLogger("ws")
 
 _connections: dict[str, WebSocket] = {}
 
-PUSH_INTERVAL = 0.1   # seconds  →  10 Hz push rate
-POS_ALPHA     = 0.6   # EMA factor: 1=instant/noisy  0=never moves
+PUSH_INTERVAL    = 0.1   # seconds  →  10 Hz push rate
+POS_ALPHA        = 0.6   # EMA factor: 1=instant/noisy  0=never moves
+HEARTBEAT_EVERY  = 5.0   # seconds between keepalive pings when no position
 
 
 def get_connections():
@@ -78,6 +80,8 @@ async def tracking_ws(ws: WebSocket, session_id: str):
     # ── push loop: trilaterate + smooth + push at 10 Hz ──────────────────────
     async def push_loop():
         nonlocal pos_x, pos_y
+        last_heartbeat = time.monotonic()
+        accuracy = 1.5
         try:
             while not stop_event.is_set():
                 await asyncio.sleep(PUSH_INTERVAL)
@@ -99,7 +103,12 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                             pos_y = POS_ALPHA * new_y + (1 - POS_ALPHA) * pos_y
 
                 if pos_x is None:
-                    continue  # no position yet — don't send
+                    # No position yet — send heartbeat to keep connection alive
+                    now = time.monotonic()
+                    if now - last_heartbeat >= HEARTBEAT_EVERY:
+                        await ws.send_json({"type": "heartbeat"})
+                        last_heartbeat = now
+                    continue
 
                 csv_log.record_fused(pos_x, pos_y, accuracy)
                 await ws.send_json({
@@ -108,6 +117,7 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                     "y":        round(pos_y, 2),
                     "accuracy": accuracy,
                 })
+                last_heartbeat = time.monotonic()
         except WebSocketDisconnect:
             pass
         except Exception as exc:

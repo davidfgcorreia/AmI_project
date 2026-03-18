@@ -13,7 +13,7 @@ import ProductList from './components/ProductList';
 import NavQueue from './components/NavQueue';
 import StatusBar from './components/StatusBar';
 import { getProducts, getShelves, getGateways, navigate as apiNavigate } from './services/api';
-import { connectTracking, disconnectTracking, isConnected, connectGateways, disconnectGateways } from './services/websocket';
+import { connectTracking, disconnectTracking, connectGateways, disconnectGateways } from './services/websocket';
 import { getOrCreateSessionId, startBleAdvertising, stopBleAdvertising } from './services/ble';
 import useIMU from './hooks/useIMU';
 
@@ -29,7 +29,6 @@ export default function App() {
   const [queue, setQueue] = useState([]);
   const [navPath, setNavPath] = useState([]);
   const [navTargets, setNavTargets] = useState([]);
-  const checkIntervalRef = useRef(null);
   const lastPendingKeyRef = useRef('');
 
   useIMU(tab === 'map');
@@ -55,13 +54,11 @@ export default function App() {
     if (!sessionId) return;
     getShelves().then(setShelves).catch(console.error);
     getGateways().then(setBeacons).catch(console.error);
-    connectTracking(sessionId, setUserPos);
+    connectTracking(sessionId, setUserPos, setWsConnected);
     connectGateways((items) => setBeacons(items || []));
-    checkIntervalRef.current = setInterval(() => setWsConnected(isConnected()), 2000);
     return () => {
       disconnectTracking();
       disconnectGateways();
-      clearInterval(checkIntervalRef.current);
     };
   }, [sessionId]);
 
@@ -165,7 +162,7 @@ export default function App() {
     setSessionId(trimmed);
     setEditingSession(false);
     disconnectTracking();
-    connectTracking(trimmed, setUserPos);
+    connectTracking(trimmed, setUserPos, setWsConnected);
   };
 
   return (

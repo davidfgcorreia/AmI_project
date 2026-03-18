@@ -5,6 +5,7 @@
 
 let _ws = null;
 let _onPosition = null;
+let _onStatusChange = null;
 let _reconnectTimer = null;
 let _gwWs = null;
 let _onGateways = null;
@@ -20,8 +21,9 @@ function wsBase() {
   return `${proto}://${window.location.host}`;
 }
 
-export function connectTracking(sessionId, onPosition) {
+export function connectTracking(sessionId, onPosition, onStatusChange) {
   _onPosition = onPosition;
+  _onStatusChange = onStatusChange;
 
   const url = `${wsBase()}/ws/track/${sessionId}`;
 
@@ -29,6 +31,7 @@ export function connectTracking(sessionId, onPosition) {
 
   _ws.onopen = () => {
     console.log('[WS] Connected:', sessionId);
+    _onStatusChange?.(true);
   };
 
   _ws.onmessage = (event) => {
@@ -37,14 +40,16 @@ export function connectTracking(sessionId, onPosition) {
       if (data.type === 'position' && _onPosition) {
         _onPosition(data);
       }
+      // heartbeat: just confirms the connection is alive
     } catch (e) {
       console.error('[WS] Parse error:', e);
     }
   };
 
   _ws.onclose = () => {
-    console.log('[WS] Disconnected – reconnecting in 3 s');
-    _reconnectTimer = setTimeout(() => connectTracking(sessionId, onPosition), 3000);
+    console.log('[WS] Disconnected – reconnecting in 1 s');
+    _onStatusChange?.(false);
+    _reconnectTimer = setTimeout(() => connectTracking(sessionId, onPosition, onStatusChange), 1000);
   };
 
   _ws.onerror = (err) => {
