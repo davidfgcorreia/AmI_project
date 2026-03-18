@@ -1,7 +1,13 @@
 """
 WebSocket endpoint for real-time position tracking.
 
-Client sends IMU data → server fuses with BLE from MQTT → broadcasts position.
+Architecture:
+  • recv_loop  — processes IMU messages as they arrive (PDR predict)
+  • push_loop  — runs at 10 Hz regardless of IMU; reads fresh BLE data,
+                 trilaterates, updates Kalman, and pushes position to client
+  This decoupling means position updates are never gated on IMU ticks,
+  eliminating the ~30 s startup delay caused by waiting for all gateways
+  to appear in the buffer before the first IMU message arrives.
 """
 import asyncio
 import json
@@ -11,7 +17,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..services.ble_trilateration import trilaterate
 from ..services.kalman_fusion import get_tracker, remove_tracker
-from ..services.mqtt_client import get_ble_buffer
+from ..services.mqtt_client import get_ble_buffer, get_fresh_readings, update_ble_reading
 from ..services.csv_logger import get_csv_logger, close_csv_logger
 from ..services.ble_logger import log_ble_reading, read_recent
 from ..services import session_manager
@@ -20,8 +26,9 @@ from ..models.schemas import BLEReading
 router = APIRouter()
 logger = logging.getLogger("ws")
 
-# Active WebSocket connections per session
 _connections: dict[str, WebSocket] = {}
+
+PUSH_INTERVAL = 0.1   # seconds — position pushed to client at up to 10 Hz
 
 
 def get_connections():
@@ -30,74 +37,44 @@ def get_connections():
 
 @router.websocket("/ws/track/{session_id}")
 async def tracking_ws(ws: WebSocket, session_id: str):
-    """
-    Real-time tracking WebSocket.
-
-    Client → Server (JSON):
-    {
-        "type": "imu",
-        "heading": 45.0,
-        "steps": 2,
-        "accel_x": 0.1, "accel_y": -0.3, "accel_z": 9.8,
-        "gyro_alpha": 0.0, "gyro_beta": 0.0, "gyro_gamma": 0.0
-    }
-
-    Server → Client (JSON):
-    {
-        "type": "position",
-        "x": 5.2,
-        "y": 3.8,
-        "accuracy": 0.9
-    }
-    """
     await ws.accept()
     _connections[session_id] = ws
     session_manager.create_or_update(session_id)
     tracker = get_tracker(session_id)
     csv_log = get_csv_logger(session_id)
-    logger.info("[WS] Connected: session=%s  (active sessions: %d)", session_id, len(_connections))
+    logger.info("[WS] Connected: session=%s", session_id)
 
-    msg_count = 0
-    try:
+    async def recv_loop():
+        """Feed IMU messages into the PDR predictor."""
         while True:
             raw = await ws.receive_text()
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
-                logger.warning("[WS] Bad JSON from %s: %s", session_id, raw[:80])
                 continue
-
-            msg_count += 1
-            msg_type = data.get("type", "imu")
-
-            if msg_type == "imu":
-                heading = data.get("heading", 0.0)
-                steps = data.get("steps", 0)
+            if data.get("type") == "imu":
+                heading = float(data.get("heading", 0.0))
+                steps   = int(data.get("steps", 0))
                 tracker.predict_pdr(heading, steps, dt=0.2)
                 csv_log.record_imu(heading, steps)
-                if steps > 0:
-                    logger.info("[WS] IMU  session=%s  heading=%.1f  steps=%d", session_id, heading, steps)
 
-            # Also check the BLE buffer (populated by MQTT listener or HTTP)
-            ble_readings = get_ble_buffer().get(session_id)
-            if ble_readings and len(ble_readings) >= 3:
-                rssi_str = "  ".join(f"{gw}={rssi:+.0f}dBm" for gw, rssi in ble_readings.items())
-                logger.info("[WS] BLE  session=%s  %s", session_id, rssi_str)
-                csv_log.record_ble(ble_readings)
-                log_ble_reading(session_id, ble_readings)
+    async def push_loop():
+        """At 10 Hz: grab fresh BLE readings, trilaterate, update Kalman, push."""
+        while True:
+            await asyncio.sleep(PUSH_INTERVAL)
 
-                ble_pos = trilaterate(ble_readings)
-                if ble_pos:
-                    logger.info("[WS] Trilateration -> (%.2f, %.2f)", ble_pos[0], ble_pos[1])
-                    csv_log.record_trilateration(ble_pos[0], ble_pos[1])
-                    best_rssi = max(ble_readings.values())
-                    tracker.update_ble(*ble_pos, best_rssi=best_rssi)
+            readings = get_fresh_readings(session_id)
+            if readings:
+                csv_log.record_ble(readings)
+                log_ble_reading(session_id, readings)
+                pos = trilaterate(readings)
+                if pos:
+                    csv_log.record_trilateration(*pos)
+                    tracker.update_ble(*pos, best_rssi=max(readings.values()))
                 else:
-                    logger.warning("[WS] Trilateration failed for session=%s", session_id)
                     csv_log.record_trilateration(None, None)
 
-            # Send fused position back
-            x, y = tracker.position
+            x, y    = tracker.position
             accuracy = round(tracker.accuracy, 2)
             csv_log.record_fused(x, y, accuracy)
             await ws.send_json({
@@ -107,84 +84,76 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 "accuracy": accuracy,
             })
 
-            # Log fused position every 5 messages to avoid spam
-            if msg_count % 5 == 0:
-                logger.info("[WS] Fused position  session=%s  (%.2f, %.2f) +/-%.2fm  [msg #%d]",
-                            session_id, x, y, accuracy, msg_count)
-
-    except WebSocketDisconnect:
-        logger.info("[WS] Disconnected: session=%s  (processed %d messages)", session_id, msg_count)
+    recv_task = asyncio.create_task(recv_loop())
+    push_task = asyncio.create_task(push_loop())
+    try:
+        done, pending = await asyncio.wait(
+            {recv_task, push_task},
+            return_when=asyncio.FIRST_EXCEPTION,
+        )
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        # Propagate the first real exception (WebSocketDisconnect is normal)
+        for task in done:
+            exc = task.exception()
+            if exc and not isinstance(exc, WebSocketDisconnect):
+                logger.error("[WS] Error session=%s: %s", session_id, exc)
     except Exception as exc:
-        logger.error("[WS] Error session=%s: %s", session_id, exc)
+        logger.error("[WS] Outer error session=%s: %s", session_id, exc)
     finally:
+        recv_task.cancel()
+        push_task.cancel()
         _connections.pop(session_id, None)
         close_csv_logger(session_id, instance=csv_log)
         remove_tracker(session_id)
+        logger.info("[WS] Disconnected: session=%s", session_id)
 
 
-# ── REST endpoints ─────────────────────────────────────────────────────────────
+# ── REST endpoints ──────────────────────────────────────────────────────────────
 
 @router.get("/api/sessions")
 async def get_sessions():
-    """Return all sessions discovered via BLE (MQTT) or WebSocket connection."""
     return session_manager.get_all()
 
 
 @router.get("/api/ble/buffer")
 async def get_ble_buffer_debug():
-    """Debug endpoint - shows current BLE buffer state."""
     return get_ble_buffer()
 
 
 @router.get("/api/ble/log")
 async def get_ble_log(n: int = 500):
-    """
-    Return the last *n* BLE RSSI readings from the persistent log.
-    Suitable for feeding directly into a time-series chart.
-
-    Response: [ { timestamp, session_id, rssi_esp32_A, rssi_esp32_B, rssi_esp32_C }, … ]
-    """
+    """Last *n* BLE RSSI readings — suitable for time-series graphs."""
     return read_recent(n)
 
 
 @router.post("/api/ble/reading")
 async def post_ble_reading(reading: BLEReading):
-    """
-    Accept a BLE RSSI reading via HTTP.
-
-    Used by the simulator in HTTP mode, or as a fallback when
-    ESP32 gateways post directly instead of using MQTT.
-    """
-    buf = get_ble_buffer()
-    is_new = reading.session_id not in buf
-    if is_new:
-        buf[reading.session_id] = {}
-        logger.info("[BLE] New session detected: %s", reading.session_id)
-    buf[reading.session_id][reading.gateway_id] = reading.rssi
-    session_manager.create_or_update(reading.session_id)
-    logger.info("[BLE] Reading  gw=%s  session=%s  rssi=%+.1f dBm",
+    """Accept a BLE RSSI reading via HTTP (simulator / ESP32 HTTP fallback)."""
+    update_ble_reading(reading.session_id, reading.gateway_id, reading.rssi)
+    logger.info("[BLE] gw=%s  session=%s  rssi=%+.1f dBm",
                 reading.gateway_id, reading.session_id, reading.rssi)
 
-    # Log to persistent BLE file on every reading
-    ble_readings = buf[reading.session_id]
-    if len(ble_readings) >= 3:
-        log_ble_reading(reading.session_id, ble_readings)
-
-    # Push updated position to active WebSocket connection (e.g. frontend on desktop)
-    if len(ble_readings) >= 3:
+    # If 3 fresh readings exist and a WebSocket is open, push immediately
+    # (supplements the push_loop for very fast ESP32 HTTP posting)
+    readings = get_fresh_readings(reading.session_id)
+    if readings:
+        log_ble_reading(reading.session_id, readings)
         ws = _connections.get(reading.session_id)
         if ws:
-            ble_pos = trilaterate(ble_readings)
-            if ble_pos:
+            pos = trilaterate(readings)
+            if pos:
                 tracker = get_tracker(reading.session_id)
-                best_rssi = max(ble_readings.values())
-                tracker.update_ble(*ble_pos, best_rssi=best_rssi)
-                x, y = tracker.position
+                tracker.update_ble(*pos, best_rssi=max(readings.values()))
                 try:
                     await ws.send_json({
                         "type": "position",
-                        "x": round(x, 2),
-                        "y": round(y, 2),
+                        "x": round(tracker.position[0], 2),
+                        "y": round(tracker.position[1], 2),
                         "accuracy": round(tracker.accuracy, 2),
                     })
                 except Exception:

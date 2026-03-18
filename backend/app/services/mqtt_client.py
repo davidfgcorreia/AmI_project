@@ -10,16 +10,59 @@ import asyncio
 import json
 import logging
 import shutil
+import time
 
 logger = logging.getLogger("mqtt")
 
-# In-memory store of latest RSSI per session
+# In-memory store of latest smoothed RSSI per session + arrival timestamps
 # { session_id: { gateway_id: rssi } }
 _ble_buffer: dict[str, dict[str, float]] = {}
+# { session_id: { gateway_id: monotonic_timestamp } }
+_ble_timestamps: dict[str, dict[str, float]] = {}
+
+# EMA smoothing factor: 0=never update, 1=no smoothing.
+# 0.4 balances responsiveness vs noise rejection.
+_EMA_ALPHA = 0.4
+
+# Readings older than this are ignored for trilateration.
+_MAX_AGE_S = 8.0
 
 
 def get_ble_buffer() -> dict[str, dict[str, float]]:
     return _ble_buffer
+
+
+def update_ble_reading(session_id: str, gateway_id: str, rssi: float):
+    """
+    Record one RSSI reading with EMA smoothing and a fresh timestamp.
+    Called by both the MQTT listener and the HTTP endpoint.
+    """
+    from ..services import session_manager
+
+    if session_id not in _ble_buffer:
+        _ble_buffer[session_id] = {}
+        _ble_timestamps[session_id] = {}
+        logger.info("[MQTT] New session: %s", session_id)
+
+    old = _ble_buffer[session_id].get(gateway_id)
+    smoothed = rssi if old is None else _EMA_ALPHA * rssi + (1 - _EMA_ALPHA) * old
+    _ble_buffer[session_id][gateway_id] = smoothed
+    _ble_timestamps[session_id][gateway_id] = time.monotonic()
+    session_manager.create_or_update(session_id)
+
+
+def get_fresh_readings(session_id: str, max_age: float = _MAX_AGE_S) -> dict[str, float] | None:
+    """
+    Return {gateway_id: rssi} for gateways whose last reading arrived
+    within *max_age* seconds.  Returns None if fewer than 3 are fresh.
+    """
+    buf = _ble_buffer.get(session_id)
+    ts  = _ble_timestamps.get(session_id)
+    if not buf or not ts:
+        return None
+    now = time.monotonic()
+    fresh = {gw: rssi for gw, rssi in buf.items() if now - ts.get(gw, 0) <= max_age}
+    return fresh if len(fresh) >= 3 else None
 
 
 async def mqtt_listener():
@@ -27,13 +70,8 @@ async def mqtt_listener():
 
     Expected JSON payload on topic `MQTT_TOPIC_BLE`:
     { "gateway_id": "esp32_A", "session_id": "IRE-xxxxxxxx", "rssi": -67 }
-
-    Sessions are created dynamically – no hardcoded filter.
-    The ESP32 gateway uses the BLE advertisement name as session_id,
-    which the Android app sets to the stable device ID (e.g. "IRE-a3b4c5d6").
     """
     from ..core.config import MQTT_BROKER_HOST, MQTT_BROKER_PORT, MQTT_TOPIC_BLE
-    from ..services import session_manager
 
     mosquitto_sub = shutil.which("mosquitto_sub")
 
@@ -44,14 +82,17 @@ async def mqtt_listener():
         while True:
             proc = None
             try:
-                proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
 
                 if proc.stdout is None:
                     logger.warning("mosquitto_sub started without stdout; retrying")
                     await asyncio.sleep(2)
                     continue
 
-                # Read lines from mosquitto_sub stdout
                 while True:
                     line = await proc.stdout.readline()
                     if not line:
@@ -62,38 +103,29 @@ async def mqtt_listener():
                     try:
                         payload = json.loads(text)
                     except json.JSONDecodeError:
-                        logger.debug("Failed to parse mosquitto_sub line: %s", text)
+                        logger.debug("Failed to parse: %s", text)
                         continue
 
-                    gw = payload.get("gateway_id")
+                    gw  = payload.get("gateway_id")
                     sid = payload.get("session_id")
                     try:
                         rssi = float(payload.get("rssi"))
                     except (TypeError, ValueError):
-                        logger.debug("Invalid rssi in payload: %s", payload)
                         continue
-
                     if sid is None or gw is None:
-                        logger.debug("Bad MQTT payload from mosquitto_sub: %s", payload)
                         continue
 
-                    # Create session on first sight, update last_seen on subsequent readings
-                    is_new = sid not in _ble_buffer
-                    if is_new:
-                        _ble_buffer[sid] = {}
-                        logger.info("[MQTT] New session discovered: %s", sid)
-                    _ble_buffer[sid][gw] = rssi
-                    session_manager.create_or_update(sid)
+                    update_ble_reading(sid, gw, rssi)
                     logger.info("[MQTT] gw=%s  session=%s  rssi=%+.1f dBm", gw, sid, rssi)
 
-                # Process exited — capture stderr if available
                 if proc.stderr is not None:
                     try:
                         stderr = await proc.stderr.read()
                         if stderr:
-                            logger.warning("mosquitto_sub exited, stderr=%s", stderr.decode(errors="ignore").strip()[:200])
+                            logger.warning("mosquitto_sub exited: %s",
+                                           stderr.decode(errors="ignore").strip()[:200])
                     except Exception:
-                        logger.debug("Failed to read mosquitto_sub stderr")
+                        pass
 
             except asyncio.CancelledError:
                 if proc is not None:
@@ -105,7 +137,6 @@ async def mqtt_listener():
             except Exception as exc:
                 logger.warning("mosquitto_sub error: %s", exc)
             finally:
-                # ensure subprocess is cleaned up
                 if proc is not None and proc.returncode is None:
                     try:
                         proc.kill()
@@ -114,5 +145,4 @@ async def mqtt_listener():
 
             await asyncio.sleep(2)
 
-    logger.warning("mosquitto_sub not available — MQTT listener disabled. Install mosquitto-clients to enable.")
-    return
+    logger.warning("mosquitto_sub not available — MQTT listener disabled.")
