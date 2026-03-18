@@ -150,12 +150,51 @@ export default function App() {
   const nextItem = pending[0] ?? null;
   const pendingCount = pending.length;
 
+  const [editingSession, setEditingSession] = useState(false);
+  const [sessionInput, setSessionInput] = useState('');
+
+  const openSessionEdit = () => {
+    setSessionInput(sessionId || '');
+    setEditingSession(true);
+  };
+
+  const saveSessionId = () => {
+    const trimmed = sessionInput.trim();
+    if (!trimmed) return;
+    localStorage.setItem('ire_session_id', trimmed);
+    setSessionId(trimmed);
+    setEditingSession(false);
+    disconnectTracking();
+    connectTracking(trimmed, setUserPos);
+  };
+
   return (
     <div className="app-shell">
       <header className="app-header">
         <span style={{ fontSize: '1.4rem' }}>🛒</span>
         <h1>Store Navigator</h1>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {editingSession ? (
+            <>
+              <input
+                autoFocus
+                value={sessionInput}
+                onChange={e => setSessionInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveSessionId(); if (e.key === 'Escape') setEditingSession(false); }}
+                style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem', width: '8rem', borderRadius: '4px', border: '1px solid #aaa' }}
+              />
+              <button onClick={saveSessionId} style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}>OK</button>
+              <button onClick={() => setEditingSession(false)} style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}>✕</button>
+            </>
+          ) : (
+            <span
+              onClick={openSessionEdit}
+              title="Tap to change session ID"
+              style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', cursor: 'pointer', maxWidth: '7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {sessionId ?? '…'}
+            </span>
+          )}
           <StatusBar connected={wsConnected} accuracy={userPos?.accuracy} />
         </div>
       </header>
