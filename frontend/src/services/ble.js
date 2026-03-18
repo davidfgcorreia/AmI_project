@@ -1,67 +1,36 @@
 /**
  * BLE Advertiser service
  *
- * Wraps the native BleAdvertiserPlugin (Android) so the app can:
- *   1. Obtain a stable device session ID
- *   2. Continuously advertise a BLE beacon so ESP32 gateways detect us
- *
- * Falls back gracefully in browsers / non-Android environments.
+ * In a browser: uses localStorage for a stable session ID.
+ * When running as a native Android app (Capacitor): the native plugin
+ * can be wired in separately — for now the web fallback is used always.
  */
-import { registerPlugin } from '@capacitor/core';
-
-const BleAdvertiser = registerPlugin('BleAdvertiser');
 
 const STORAGE_KEY = 'ire_session_id';
 
 /**
  * Returns a stable session ID for this device.
- * Priority:
- *   1. Native plugin (Android ID-based, survives app reinstall)
- *   2. localStorage (generated once, survives page reloads)
- *   3. Random fallback (in-memory only)
+ * Generated once and persisted in localStorage.
  */
 export async function getOrCreateSessionId() {
-  // Try native plugin first (most stable)
-  try {
-    const { sessionId } = await BleAdvertiser.getSessionId();
-    if (sessionId) {
-      localStorage.setItem(STORAGE_KEY, sessionId);
-      return sessionId;
-    }
-  } catch {
-    // Not running as native Android app
-  }
-
-  // localStorage fallback (web browser / Capacitor web)
   let sessionId = localStorage.getItem(STORAGE_KEY);
   if (!sessionId) {
-    sessionId = 'IRE-' + Math.random().toString(36).slice(2, 10);
+    sessionId = 'IRE-' + Math.random().toString(36).slice(2, 10).toUpperCase();
     localStorage.setItem(STORAGE_KEY, sessionId);
   }
   return sessionId;
 }
 
 /**
- * Start BLE advertising so ESP32 gateways can detect this device.
- * The advertised device name equals sessionId, which the ESP32 forwards
- * as session_id in MQTT messages to the backend.
+ * BLE advertising is only available in the native Android app.
+ * In a browser the ESP32s identify the device by session ID sent
+ * over WebSocket/HTTP, so advertising is not needed.
  */
-export async function startBleAdvertising(sessionId) {
-  try {
-    await BleAdvertiser.start({ sessionId });
-    console.log('[BLE] Advertising started, session:', sessionId);
-    return true;
-  } catch (err) {
-    console.warn('[BLE] Advertising unavailable:', err?.message ?? err);
-    return false;
-  }
+export async function startBleAdvertising(_sessionId) {
+  console.log('[BLE] Running in browser — advertising not available');
+  return false;
 }
 
-/** Stop BLE advertising (called on app unmount). */
 export async function stopBleAdvertising() {
-  try {
-    await BleAdvertiser.stop();
-  } catch {
-    // Ignore – may not be advertising
-  }
+  // No-op in browser
 }
