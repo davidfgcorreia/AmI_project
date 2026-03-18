@@ -47,24 +47,25 @@ class KalmanTracker:
         """
         Predict new position using PDR (heading from gyroscope + step count).
         heading_deg: compass heading (0=North, 90=East).
+
+        Covariance P is always propagated — even with no steps — so it grows
+        between BLE updates and the Kalman gain stays healthy.  Without this,
+        P freezes near zero, K → 0, and BLE corrections barely move the estimate.
         """
-        if steps <= 0:
-            return
-
-        rad = math.radians(heading_deg)
-        dx = STEP_LENGTH * steps * math.sin(rad)
-        dy = STEP_LENGTH * steps * math.cos(rad)
-        vx = dx / max(dt, 0.01)
-        vy = dy / max(dt, 0.01)
-
-        # State transition (constant-velocity)
         F = np.eye(4)
         F[0, 2] = dt
         F[1, 3] = dt
 
-        # Update velocity component with PDR estimate
-        self.x[2] = vx
-        self.x[3] = vy
+        if steps > 0:
+            rad = math.radians(heading_deg)
+            dx = STEP_LENGTH * steps * math.sin(rad)
+            dy = STEP_LENGTH * steps * math.cos(rad)
+            self.x[2] = dx / max(dt, 0.01)
+            self.x[3] = dy / max(dt, 0.01)
+        else:
+            # No movement detected — damp velocity so it doesn't drift
+            self.x[2] *= 0.5
+            self.x[3] *= 0.5
 
         self.x = F @ self.x
         self.P = F @ self.P @ F.T + self.Q

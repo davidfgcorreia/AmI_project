@@ -33,10 +33,9 @@ BLE_NEAR_DIST_AT_REF = 0.5  # measured distance (m) at RSSI = -50 dBm
 BLE_FAR_DBM_PER_M = 5.0    # measured: ~5 dBm loss per metre beyond 1 m
 
 # ── Kalman filter process / measurement noise ──
-KALMAN_PROCESS_NOISE = 0.4   # higher = follows movement faster
-# Base BLE noise: dynamically scaled by signal strength in kalman_fusion.py
-# (this is the noise assumed when best RSSI == BLE_TX_POWER, i.e. exactly 1 m away)
-KALMAN_MEASUREMENT_NOISE = 1.0
+KALMAN_PROCESS_NOISE = 1.5   # high = P grows fast between updates → Kalman gain stays healthy
+# Base BLE noise at 1 m reference; dynamically scaled by signal strength in kalman_fusion.py
+KALMAN_MEASUREMENT_NOISE = 0.5
 
 # ── Navigation ──
 STORE_WIDTH = 12.0        # metres  (must match FloorMap.jsx STORE_W)
