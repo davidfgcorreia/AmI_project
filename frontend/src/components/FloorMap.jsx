@@ -6,7 +6,7 @@
  *   • Navigation path (animated blue line)
  *   • Target markers (red pins)
  */
-import React, { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 
 const STORE_W = 12;  // metres
 const STORE_H = 5;
@@ -26,17 +26,21 @@ const COLORS = {
 export default function FloorMap({ shelves = [], userPos, path = [], targets = [], beacons = [] }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
-
-  // Keep latest rect for draw to use CSS pixels
   const rectRef = useRef({ width: 300, height: 200 });
 
+  // Mirror props into a ref so the stable rAF loop always reads fresh data
+  // without needing to be recreated (which would cancel+restart and cause flashes).
+  const dataRef = useRef({ shelves, userPos, path, targets, beacons });
+  dataRef.current = { shelves, userPos, path, targets, beacons };
+
+  // Stable draw — never recreated, reads from dataRef each frame.
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    // Use CSS pixel sizes (after DPR scaling ctx.setTransform was called)
     const W = rectRef.current.width;
     const H = rectRef.current.height;
+    const { shelves, userPos, path, targets, beacons } = dataRef.current;
 
     const sx = W / STORE_W;
     const sy = H / STORE_H;
@@ -91,7 +95,6 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillRect(sxp, syp, sw, sh);
       ctx.strokeRect(sxp, syp, sw, sh);
 
-      // Shelf label
       ctx.fillStyle = COLORS.text;
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'center';
@@ -100,12 +103,11 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
 
     // Beacons / Gateways
     beacons.forEach((b) => {
-      ctx.fillStyle = '#2e7d32'; // green
+      ctx.fillStyle = '#2e7d32';
       ctx.beginPath();
       ctx.arc(tx(b.x), ty(b.y), 6, 0, Math.PI * 2);
       ctx.fill();
 
-      // beacon label
       ctx.fillStyle = COLORS.text;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'left';
@@ -140,14 +142,12 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
 
     // User position
     if (userPos) {
-      // Accuracy circle
       const accRadius = (userPos.accuracy || 1.5) * scale;
       ctx.fillStyle = COLORS.userGlow;
       ctx.beginPath();
       ctx.arc(tx(userPos.x), ty(userPos.y), accRadius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Dot
       ctx.fillStyle = COLORS.user;
       ctx.beginPath();
       ctx.arc(tx(userPos.x), ty(userPos.y), 7, 0, Math.PI * 2);
@@ -158,7 +158,7 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     }
 
     animRef.current = requestAnimationFrame(draw);
-  }, [shelves, userPos, path, targets, beacons]);
+  }, []); // empty deps — loop is started once and never restarted
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -175,7 +175,6 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       rectRef.current = { width: rect.width, height: rect.height };
     }
 
-    // Initial resize + listeners
     resize();
     window.addEventListener('resize', resize);
     const ro = new ResizeObserver(resize);
@@ -188,7 +187,7 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       window.removeEventListener('resize', resize);
       try { ro.disconnect(); } catch (e) {}
     };
-  }, [draw]);
+  }, []); // mount/unmount only — loop is never cancelled mid-session
 
   return (
     <div className="map-container">

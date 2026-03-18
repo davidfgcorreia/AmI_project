@@ -13,6 +13,7 @@ from ..services.ble_trilateration import trilaterate
 from ..services.kalman_fusion import get_tracker, remove_tracker
 from ..services.mqtt_client import get_ble_buffer
 from ..services.csv_logger import get_csv_logger, close_csv_logger
+from ..services.ble_logger import log_ble_reading, read_recent
 from ..models.schemas import BLEReading
 
 router = APIRouter()
@@ -81,6 +82,7 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                 rssi_str = "  ".join(f"{gw}={rssi:+.0f}dBm" for gw, rssi in ble_readings.items())
                 logger.info("[WS] 📡 BLE  session=%s  %s", session_id, rssi_str)
                 csv_log.record_ble(ble_readings)
+                log_ble_reading(session_id, ble_readings)
 
                 ble_pos = trilaterate(ble_readings)
                 if ble_pos:
@@ -126,6 +128,17 @@ async def get_ble_buffer_debug():
     return get_ble_buffer()
 
 
+@router.get("/api/ble/log")
+async def get_ble_log(n: int = 500):
+    """
+    Return the last *n* BLE RSSI readings from the persistent log.
+    Suitable for feeding directly into a time-series chart.
+
+    Response: [ { timestamp, session_id, rssi_esp32_A, rssi_esp32_B, rssi_esp32_C }, … ]
+    """
+    return read_recent(n)
+
+
 @router.post("/api/ble/reading")
 async def post_ble_reading(reading: BLEReading):
     """
@@ -143,8 +156,12 @@ async def post_ble_reading(reading: BLEReading):
     logger.info("[BLE] 📡 Reading  gw=%s  session=%s  rssi=%+.1f dBm",
                 reading.gateway_id, reading.session_id, reading.rssi)
 
-    # Push updated position to active WebSocket connection (e.g. frontend on desktop)
+    # Log to persistent BLE file on every reading
     ble_readings = buf[reading.session_id]
+    if len(ble_readings) >= 3:
+        log_ble_reading(reading.session_id, ble_readings)
+
+    # Push updated position to active WebSocket connection (e.g. frontend on desktop)
     if len(ble_readings) >= 3:
         ws = _connections.get(reading.session_id)
         if ws:
