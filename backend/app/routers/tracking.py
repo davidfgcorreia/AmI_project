@@ -12,6 +12,7 @@ Architecture:
 import asyncio
 import json
 import logging
+import math
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -76,6 +77,9 @@ async def tracking_ws(ws: WebSocket, session_id: str):
 
             x, y    = tracker.position
             accuracy = round(tracker.accuracy, 2)
+            # Guard: NaN/inf in position would crash json.dumps and kill the task
+            if not (math.isfinite(x) and math.isfinite(y)):
+                continue
             csv_log.record_fused(x, y, accuracy)
             await ws.send_json({
                 "type": "position",

@@ -1,19 +1,21 @@
 """
 BLE Trilateration Service
 ─────────────────────────
-Converts RSSI readings from 3+ ESP32 gateways into (x, y) coordinates.
+Converts RSSI readings from 3+ ESP32 gateways into (x, y) coordinates
+using a weighted nonlinear least-squares fit of the circle equations.
 
-Uses a fast analytical Weighted Linear Least-Squares (WLLS) approach
-instead of iterative optimisation: linearises the circle equations by
-pairwise subtraction, then solves the resulting overdetermined system
-with numpy.linalg.lstsq.  Typically 100-200× faster than scipy.
+The nonlinear formulation (vs a linearised one) is essential here because
+the three gateway positions are near-collinear, making the linearised
+system ill-conditioned.  scipy soft_l1 loss also handles RSSI outliers.
 """
 import math
 import logging
 import numpy as np
+from scipy.optimize import least_squares
 from ..core.config import (
-    GATEWAY_POSITIONS, BLE_TX_POWER, BLE_PATH_LOSS_EXP,
+    GATEWAY_POSITIONS, BLE_TX_POWER,
     BLE_NEAR_RSSI, BLE_NEAR_DIST_AT_REF, BLE_FAR_DBM_PER_M,
+    STORE_WIDTH, STORE_HEIGHT,
 )
 
 logger = logging.getLogger("ble")
@@ -30,27 +32,25 @@ def rssi_to_distance(rssi: float) -> float:
     if rssi >= 0:
         return 0.1
     if rssi > BLE_NEAR_RSSI:
-        slope = (BLE_NEAR_DIST_AT_REF - 1.0) / (-50 - BLE_NEAR_RSSI)
+        slope = (BLE_NEAR_DIST_AT_REF - 1.0) / (-50.0 - BLE_NEAR_RSSI)
         return max(0.1, 1.0 + (rssi - BLE_NEAR_RSSI) * slope)
     return 1.0 + (BLE_TX_POWER - rssi) / BLE_FAR_DBM_PER_M
+
+
+def _residuals(point, gateways, distances, weights):
+    x, y = point
+    return [
+        w * (math.sqrt((x - gx)**2 + (y - gy)**2) - d)
+        for (gx, gy), d, w in zip(gateways, distances, weights)
+    ]
 
 
 def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
     """
     Trilaterate user position from BLE RSSI readings (≥ 3 gateways).
-
-    Algorithm — Weighted Linear Least Squares:
-      Subtracting gateway-1's circle equation from gateway-i's yields a
-      linear equation in (x, y).  Weighting each equation by signal
-      strength makes closer gateways dominate the fit (they have smaller
-      RSSI variance because the signal can only be attenuated, not
-      amplified).
-
-    Returns (x, y) in metres, or None if insufficient data.
+    Returns (x, y) clamped to store bounds, or None on failure.
     """
-    gateways: list[tuple[float, float]] = []
-    distances: list[float] = []
-    weights: list[float] = []
+    gateways, distances, weights = [], [], []
 
     for gw_id, rssi in readings.items():
         pos = GATEWAY_POSITIONS.get(gw_id)
@@ -58,35 +58,31 @@ def trilaterate(readings: dict[str, float]) -> tuple[float, float] | None:
             continue
         gateways.append(pos)
         distances.append(rssi_to_distance(rssi))
-        # Amplitude ratio relative to 1-m reference — strong signal → high weight
+        # Strong signal → high weight (signal can only be attenuated, not amplified)
         weights.append(max(0.05, 10 ** ((rssi - BLE_TX_POWER) / 20)))
 
     if len(gateways) < 3:
-        logger.warning("[BLE-TRI] Only %d known gateways (need ≥3)", len(gateways))
         return None
 
-    # Build linear system by subtracting the first circle equation from each other.
-    # (x−x1)²+(y−y1)²=r1²  minus  (x−xi)²+(y−yi)²=ri²  →
-    #   2(xi−x1)·x + 2(yi−y1)·y = r1²−ri² + xi²−x1² + yi²−y1²
-    x1, y1 = gateways[0]
-    r1      = distances[0]
-    w1      = weights[0]
+    x0 = np.mean([g[0] for g in gateways])
+    y0 = np.mean([g[1] for g in gateways])
 
-    A_rows, b_rows = [], []
-    for i in range(1, len(gateways)):
-        xi, yi = gateways[i]
-        ri, wi = distances[i], weights[i]
-        w_row = math.sqrt(w1 * wi)           # geometric-mean weight for this pair
-        A_rows.append([2 * w_row * (xi - x1),
-                        2 * w_row * (yi - y1)])
-        b_rows.append(w_row * (r1**2 - ri**2 + xi**2 - x1**2 + yi**2 - y1**2))
+    try:
+        result = least_squares(
+            _residuals, x0=[x0, y0],
+            args=(gateways, distances, weights),
+            loss="soft_l1",
+            bounds=([0, 0], [STORE_WIDTH, STORE_HEIGHT]),  # clamp to room
+        )
+    except Exception as e:
+        logger.warning("[BLE-TRI] least_squares failed: %s", e)
+        return None
 
-    A = np.array(A_rows, dtype=float)
-    b = np.array(b_rows, dtype=float)
+    x_out, y_out = float(result.x[0]), float(result.x[1])
 
-    result, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
-    x_out, y_out = float(result[0]), float(result[1])
+    if not math.isfinite(x_out) or not math.isfinite(y_out):
+        logger.warning("[BLE-TRI] Non-finite result, discarding")
+        return None
 
-    logger.debug("[BLE-TRI] → (%.2f, %.2f)  weights=%s",
-                 x_out, y_out, [f"{w:.2f}" for w in weights])
+    logger.debug("[BLE-TRI] → (%.2f, %.2f)  cost=%.4f", x_out, y_out, result.cost)
     return x_out, y_out

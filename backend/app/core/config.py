@@ -19,9 +19,9 @@ MQTT_TOPIC_BLE = "ire/ble/rssi"          # ESP32 publishes here
 # ── BLE gateway positions (x, y) in metres from store origin ──
 # Adjust to real deployment positions
 GATEWAY_POSITIONS = {
-    "esp32_A": (2.0, 2.0),
-    "esp32_B": (10.0, 3.0),
-    "esp32_C": (6.0, 2.5),
+    "esp32_A": (5.5, 0.5),
+    "esp32_B": (10.0, 4.5),
+    "esp32_C": (1.0, 4.5),
 }
 
 # ── Trilateration tuning ──
