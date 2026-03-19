@@ -31,6 +31,7 @@ frontend/.env.production
 frontend/android/
 
 # ── IDE / Editor ──
+.claude/
 .vscode/
 .idea/
 *.swp

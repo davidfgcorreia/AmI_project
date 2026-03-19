@@ -14,7 +14,8 @@
       "Bash(source venv/bin/activate)",
       "Bash(python -c \"from app.routers.tracking import router; print\\(''OK''\\)\")",
       "Bash(python -c \"from app.services.kalman_fusion import KalmanTracker; t = KalmanTracker\\(\\); t.update_ble\\(4.0, 3.0, -60\\); t.predict_pdr\\(90.0, 2, 0.2\\); t.update_ble\\(4.5, 3.0, -65\\); print\\(f''pos={t.position}, acc={t.accuracy:.2f}''\\); print\\(''OK''\\)\")",
-      "Bash(python -c \"from app.main import app; print\\(''OK''\\)\")"
+      "Bash(python -c \"from app.main import app; print\\(''OK''\\)\")",
+      "Bash(./gradlew assembleDebug)"
     ]
   }
 }
