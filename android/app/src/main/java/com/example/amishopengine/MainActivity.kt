@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         // ── Change this to your laptop/server IP before building ──────────────
-        const val FRONTEND_URL = "http://192.168.100.222:3000"
+        const val FRONTEND_URL = "http://192.168.0.102:3000"
         // ──────────────────────────────────────────────────────────────────────
         private const val REQ_BLE = 1
         private val BLE_PERMISSIONS = arrayOf(
