@@ -8,8 +8,12 @@
  */
 import { useRef, useEffect, useCallback } from 'react';
 
-const STORE_W = 8;  // metres
-const STORE_H = 5.5;
+const REAL_W = 8;    // metres (physical width)
+const REAL_H = 5.5;  // metres (physical height)
+// Rotate 90° for portrait phones: map long axis runs vertically
+const ROTATED = true;
+const STORE_W = ROTATED ? REAL_H : REAL_W;
+const STORE_H = ROTATED ? REAL_W : REAL_H;
 
 const COLORS = {
   bg: '#f0f2f5',
@@ -48,46 +52,63 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     const ox = (W - STORE_W * scale) / 2;
     const oy = (H - STORE_H * scale) / 2;
 
-    const tx = (x) => ox + x * scale;
-    const ty = (y) => oy + (STORE_H - y) * scale; // flip Y
+    // When rotated: real (x,y) → screen (y, REAL_W - x)
+    const tx = (x, y) => ROTATED ? ox + y * scale : ox + x * scale;
+    const ty = (x, y) => ROTATED ? oy + (REAL_W - x) * scale : oy + (STORE_H - y) * scale;
 
     // Clear
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, W, H);
 
-    // Grid
+    // Grid (in real-world coords)
     ctx.strokeStyle = COLORS.grid;
     ctx.lineWidth = 0.5;
-    for (let x = 0; x <= STORE_W; x++) {
+    for (let x = 0; x <= REAL_W; x++) {
       ctx.beginPath();
-      ctx.moveTo(tx(x), ty(0));
-      ctx.lineTo(tx(x), ty(STORE_H));
+      ctx.moveTo(tx(x, 0), ty(x, 0));
+      ctx.lineTo(tx(x, REAL_H), ty(x, REAL_H));
       ctx.stroke();
     }
-    for (let y = 0; y <= STORE_H; y++) {
+    for (let y = 0; y <= REAL_H; y++) {
       ctx.beginPath();
-      ctx.moveTo(tx(0), ty(y));
-      ctx.lineTo(tx(STORE_W), ty(y));
+      ctx.moveTo(tx(0, y), ty(0, y));
+      ctx.lineTo(tx(REAL_W, y), ty(REAL_W, y));
       ctx.stroke();
     }
 
     // Store outline
     ctx.strokeStyle = '#455a64';
     ctx.lineWidth = 2;
-    ctx.strokeRect(tx(0), ty(STORE_H), STORE_W * scale, STORE_H * scale);
+    const outX = tx(0, 0);
+    const outY = ty(REAL_W, 0);
+    ctx.strokeRect(outX, outY, STORE_W * scale, STORE_H * scale);
 
-    // Entrance label
+    // Entrance label (entrance is at y=0 side of the real room)
     ctx.fillStyle = COLORS.text;
     ctx.font = `bold ${12}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('ENTRANCE', tx(STORE_W / 2), ty(-0.3));
+    const entX = tx(REAL_W / 2, -0.05);
+    const entY = ty(REAL_W / 2, -0.05);
+    if (ROTATED) {
+      // When rotated, entrance is on the left edge — draw vertically
+      ctx.save();
+      ctx.translate(entX, entY);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('ENTRANCE', 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText('ENTRANCE', entX, entY);
+    }
 
     // Shelves
     shelves.forEach((s) => {
-      const sw = (s.width || 1) * scale;
-      const sh = (s.height || 0.8) * scale;
-      const sxp = tx(s.x) - sw / 2;
-      const syp = ty(s.y) - sh / 2;
+      const rw = s.width || 1;
+      const rh = s.height || 0.8;
+      // In rotated mode, shelf real width→screen height and vice versa
+      const sw = (ROTATED ? rh : rw) * scale;
+      const sh = (ROTATED ? rw : rh) * scale;
+      const sxp = tx(s.x, s.y) - sw / 2;
+      const syp = ty(s.x, s.y) - sh / 2;
 
       ctx.fillStyle = COLORS.shelf;
       ctx.strokeStyle = COLORS.shelfStroke;
@@ -98,20 +119,20 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillStyle = COLORS.text;
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(s.name || `S${s.id}`, tx(s.x), ty(s.y) + 3);
+      ctx.fillText(s.name || `S${s.id}`, tx(s.x, s.y), ty(s.x, s.y) + 3);
     });
 
     // Beacons / Gateways
     beacons.forEach((b) => {
       ctx.fillStyle = '#2e7d32';
       ctx.beginPath();
-      ctx.arc(tx(b.x), ty(b.y), 6, 0, Math.PI * 2);
+      ctx.arc(tx(b.x, b.y), ty(b.x, b.y), 6, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = COLORS.text;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(b.id, tx(b.x) + 8, ty(b.y) + 4);
+      ctx.fillText(b.id, tx(b.x, b.y) + 8, ty(b.x, b.y) + 4);
     });
 
     // Navigation path
@@ -120,9 +141,9 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 4]);
       ctx.beginPath();
-      ctx.moveTo(tx(path[0].x), ty(path[0].y));
+      ctx.moveTo(tx(path[0].x, path[0].y), ty(path[0].x, path[0].y));
       for (let i = 1; i < path.length; i++) {
-        ctx.lineTo(tx(path[i].x), ty(path[i].y));
+        ctx.lineTo(tx(path[i].x, path[i].y), ty(path[i].x, path[i].y));
       }
       ctx.stroke();
       ctx.setLineDash([]);
@@ -132,12 +153,12 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     targets.forEach((t) => {
       ctx.fillStyle = COLORS.target;
       ctx.beginPath();
-      ctx.arc(tx(t.x), ty(t.y), 8, 0, Math.PI * 2);
+      ctx.arc(tx(t.x, t.y), ty(t.x, t.y), 8, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('★', tx(t.x), ty(t.y) + 4);
+      ctx.fillText('★', tx(t.x, t.y), ty(t.x, t.y) + 4);
     });
 
     // User position
@@ -145,12 +166,12 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       const accRadius = (userPos.accuracy || 1.5) * scale;
       ctx.fillStyle = COLORS.userGlow;
       ctx.beginPath();
-      ctx.arc(tx(userPos.x), ty(userPos.y), accRadius, 0, Math.PI * 2);
+      ctx.arc(tx(userPos.x, userPos.y), ty(userPos.x, userPos.y), accRadius, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = COLORS.user;
       ctx.beginPath();
-      ctx.arc(tx(userPos.x), ty(userPos.y), 7, 0, Math.PI * 2);
+      ctx.arc(tx(userPos.x, userPos.y), ty(userPos.x, userPos.y), 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;

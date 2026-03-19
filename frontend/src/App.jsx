@@ -200,7 +200,7 @@ export default function App() {
 
         {/* ── Map tab: map + next stop ── */}
         {tab === 'map' && (
-          <>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <FloorMap
               shelves={shelves}
               userPos={userPos}
@@ -240,7 +240,7 @@ export default function App() {
                 Search for products and add them to your queue.
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* ── Queue tab ── */}

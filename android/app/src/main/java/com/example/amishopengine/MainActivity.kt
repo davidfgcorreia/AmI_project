@@ -8,6 +8,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
@@ -37,6 +38,17 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(NativeBridge(sessionManager), "AndroidBridge")
         }
         setContentView(webView)
+
+        // Navigate within the React SPA on back press; exit only when at root
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) webView.goBack()
+                else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
 
         // Load the page first — BLE/IMU start after permissions are confirmed
         webView.loadUrl("$FRONTEND_URL?session=${sessionManager.getOrCreate()}")
@@ -68,12 +80,6 @@ class MainActivity : ComponentActivity() {
         imuManager.stop()
     }
 
-    // Navigate within the React SPA on back press; exit only when at root
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
-    }
-
     private fun blePermissionsGranted() = BLE_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
     }
@@ -91,7 +97,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         // ── Change this to your laptop/server IP before building ──────────────
-        const val FRONTEND_URL = "http://192.168.0.102:3000"
+        const val FRONTEND_URL = "http://192.168.100.222:3000"
         // ──────────────────────────────────────────────────────────────────────
         private const val REQ_BLE = 1
         private val BLE_PERMISSIONS = arrayOf(

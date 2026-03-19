@@ -36,9 +36,19 @@ BLE_NEAR_DIST_AT_REF = 0.9  # measured distance (m) at RSSI = -50 dBm
 BLE_FAR_DBM_PER_M = 5.0    # measured: ~5 dBm loss per metre beyond 1 m
 
 # ── Kalman filter process / measurement noise ──
-KALMAN_PROCESS_NOISE = 1.5   # high = P grows fast between updates → Kalman gain stays healthy
-# Base BLE noise at 1 m reference; dynamically scaled by signal strength in kalman_fusion.py
-KALMAN_MEASUREMENT_NOISE = 0.5
+# Process noise *per second* (scaled by dt in predict).
+# Controls how fast uncertainty grows between BLE corrections.
+# Lower = trust PDR longer; higher = trust BLE sooner.
+KALMAN_PROCESS_NOISE = 0.3
+# Base BLE measurement noise (variance in metres^2).
+# Dynamically scaled by signal strength in kalman_fusion.py.
+# Higher = smoother but slower to correct; lower = more reactive but jumpier.
+KALMAN_MEASUREMENT_NOISE = 1.5
+
+# Degrees added to compass heading to align with store Y-axis.
+# Calibrate: walk along +Y (away from entrance), read compass heading, set offset
+# so that heading + offset = 0.  E.g. if walking +Y reads 90 on compass, set -90.
+HEADING_OFFSET = 0.0
 
 # ── Navigation ──
 STORE_WIDTH = 8        # metres  (must match FloorMap.jsx STORE_W)

@@ -18,8 +18,13 @@ class BleAdvertiser(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun start(sessionId: String) {
-        val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
-            .adapter
+        val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)
+            ?.adapter
+
+        if (adapter == null) {
+            Log.e(TAG, "Bluetooth not available on this device")
+            return
+        }
 
         if (!adapter.isEnabled) {
             Log.e(TAG, "Bluetooth is off")
@@ -75,9 +80,9 @@ class BleAdvertiser(private val context: Context) {
         callback?.let { advertiser?.stopAdvertising(it) }
         // Restore the original Bluetooth device name
         originalName?.let {
-            val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager)
-                .adapter
-            adapter.setName(it)
+            val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)
+                ?.adapter
+            adapter?.setName(it)
         }
         Log.i(TAG, "Advertising stopped, name restored to: $originalName")
     }

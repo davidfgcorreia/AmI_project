@@ -1,114 +1,124 @@
 """
 IMU / PDR + Kalman Filter Sensor Fusion
-───────────────────────────────────────
+----------------------------------------
 Fuses BLE-derived absolute position with IMU-based Pedestrian Dead Reckoning
 (PDR) to achieve smooth, sub-metre tracking in noisy retail environments.
 
 State vector: [x, y, vx, vy]
+
+Predict: set velocity from PDR, propagate state with F, grow P by Q*dt.
+Update:  BLE trilateration corrects position; R scaled by signal strength.
 """
 import math
 import logging
 import numpy as np
-from ..core.config import KALMAN_PROCESS_NOISE, KALMAN_MEASUREMENT_NOISE, BLE_TX_POWER
+from ..core.config import (
+    KALMAN_PROCESS_NOISE, KALMAN_MEASUREMENT_NOISE, BLE_TX_POWER,
+    STORE_WIDTH, STORE_HEIGHT, HEADING_OFFSET,
+)
 
 logger = logging.getLogger("kalman")
 
-# Average human step length (m)
-STEP_LENGTH = 0.65
+STEP_LENGTH = 0.65  # average human step length (m)
+
+# Caps to prevent covariance explosion when BLE is absent for a long time
+_P_POS_MAX = 8.0
+_P_VEL_MAX = 4.0
 
 
 class KalmanTracker:
-    """
-    Extended Kalman-style tracker.
-
-    • Predict step uses IMU heading + step count (PDR).
-    • Update step corrects with BLE trilateration.
-    """
-
     def __init__(self):
-        # State: [x, y, vx, vy]
-        self.x = np.zeros(4)
-        # Covariance
-        self.P = np.eye(4) * 10.0
-        # Process noise
+        self.x = np.zeros(4)           # [x, y, vx, vy]
+        self.P = np.eye(4) * 10.0      # large — shrinks on first BLE update
+
         q = KALMAN_PROCESS_NOISE
-        self.Q = np.diag([q, q, q * 2, q * 2])
-        # Measurement noise (BLE is noisy)
-        r = KALMAN_MEASUREMENT_NOISE
-        self.R = np.diag([r, r])
-        # Observation matrix: we only measure [x, y]
+        self.Q_base = np.diag([q, q, q * 4, q * 4])
+
         self.H = np.array([
             [1, 0, 0, 0],
             [0, 1, 0, 0],
         ], dtype=float)
+
         self._initialised = False
+
+    # -- predict ---------------------------------------------------------------
 
     def predict_pdr(self, heading_deg: float, steps: int, dt: float = 0.1):
         """
-        Predict new position using PDR (heading from gyroscope + step count).
-        heading_deg: compass heading (0=North, 90=East).
-
-        Covariance P is always propagated — even with no steps — so it grows
-        between BLE updates and the Kalman gain stays healthy.  Without this,
-        P freezes near zero, K → 0, and BLE corrections barely move the estimate.
+        Predict using PDR: set velocity from step displacement, then propagate
+        with constant-velocity transition F.  F @ x gives x += vx*dt.
         """
+        dt = max(dt, 0.01)
+
         F = np.eye(4)
         F[0, 2] = dt
         F[1, 3] = dt
 
+        dx, dy = 0.0, 0.0
         if steps > 0:
-            rad = math.radians(heading_deg)
+            rad = math.radians(heading_deg + HEADING_OFFSET)
             dx = STEP_LENGTH * steps * math.sin(rad)
             dy = STEP_LENGTH * steps * math.cos(rad)
-            self.x[2] = dx / max(dt, 0.01)
-            self.x[3] = dy / max(dt, 0.01)
+            self.x[2] = dx / dt
+            self.x[3] = dy / dt
         else:
-            # No movement detected — damp velocity so it doesn't drift
-            self.x[2] *= 0.5
-            self.x[3] *= 0.5
+            self.x[2] *= 0.8
+            self.x[3] *= 0.8
 
+        # Propagate state and covariance consistently through F
         self.x = F @ self.x
-        self.P = F @ self.P @ F.T + self.Q
-        logger.debug("[KALMAN] PDR predict  heading=%.1f°  steps=%d  dx=%.2f dy=%.2f → (%.2f, %.2f)",
-                     heading_deg, steps, dx, dy, self.x[0], self.x[1])
+        self.P = F @ self.P @ F.T + self.Q_base * dt
+        self._cap_and_clamp()
+
+        logger.debug("[KALMAN] PDR  h=%.0f steps=%d dx=%.2f dy=%.2f -> (%.2f,%.2f) P=%.2f",
+                     heading_deg, steps, dx, dy, self.x[0], self.x[1], self.P[0, 0])
+
+    # -- update ----------------------------------------------------------------
 
     def update_ble(self, ble_x: float, ble_y: float, best_rssi: float | None = None):
         """
-        Correction step using BLE trilateration measurement.
-
-        best_rssi: strongest (least negative) RSSI seen in this scan.
-            Used to scale measurement noise — a strong reading means we're
-            definitely close to an ESP so BLE is reliable; a weak reading
-            means we may be far or obstructed so we trust BLE less.
+        Correction step using BLE trilateration.
+        Dynamic R: strong signal -> low noise (trust BLE); weak -> high noise (trust PDR).
         """
         if not self._initialised:
             self.x[0] = ble_x
             self.x[1] = ble_y
+            # Reasonable initial uncertainty (not 10.0 which causes P explosion)
+            self.P = np.diag([1.0, 1.0, 1.0, 1.0])
             self._initialised = True
-            logger.info("[KALMAN] 🆕 Initialised at (%.2f, %.2f)", ble_x, ble_y)
+            logger.info("[KALMAN] Init at (%.2f, %.2f)", ble_x, ble_y)
             return
 
-        # Dynamic R: scales with signal strength.
-        # At best_rssi == BLE_TX_POWER (-70 dBm, i.e. 1 m) → r = base noise.
-        # At best_rssi == -45 dBm (very close) → r ≈ 0.18 × base (trust BLE a lot).
-        # At best_rssi == -90 dBm (far / blocked) → r ≈ 3.2 × base (trust BLE less).
         if best_rssi is not None:
             r = KALMAN_MEASUREMENT_NOISE * 10 ** ((BLE_TX_POWER - best_rssi) / 20)
-            r = max(0.15, min(4.0, r))
+            r = max(0.3, min(6.0, r))
         else:
             r = KALMAN_MEASUREMENT_NOISE
         R = np.diag([r, r])
 
         z = np.array([ble_x, ble_y])
-        y = z - self.H @ self.x                 # innovation
-        S = self.H @ self.P @ self.H.T + R      # innovation covariance
-        K = self.P @ self.H.T @ np.linalg.inv(S)  # Kalman gain
+        y = z - self.H @ self.x
+        S = self.H @ self.P @ self.H.T + R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
 
         self.x = self.x + K @ y
-        I = np.eye(4)
-        self.P = (I - K @ self.H) @ self.P
-        logger.info("[KALMAN] BLE update  meas=(%.2f, %.2f)  innov=(%.2f, %.2f) → fused=(%.2f, %.2f)  r=%.2f  acc=%.2fm",
-                    ble_x, ble_y, float(y[0]), float(y[1]), self.x[0], self.x[1], r, self.accuracy)
+        self.P = (np.eye(4) - K @ self.H) @ self.P
+        self._cap_and_clamp()
+
+        logger.info("[KALMAN] BLE  meas=(%.2f,%.2f) innov=(%.2f,%.2f) K=%.2f -> (%.2f,%.2f) r=%.2f acc=%.2fm",
+                    ble_x, ble_y, float(y[0]), float(y[1]),
+                    float(K[0, 0]), self.x[0], self.x[1], r, self.accuracy)
+
+    # -- helpers ---------------------------------------------------------------
+
+    def _cap_and_clamp(self):
+        """Clamp position to store, cap covariance to prevent explosion."""
+        self.x[0] = max(0, min(STORE_WIDTH, self.x[0]))
+        self.x[1] = max(0, min(STORE_HEIGHT, self.x[1]))
+        self.P[0, 0] = min(self.P[0, 0], _P_POS_MAX)
+        self.P[1, 1] = min(self.P[1, 1], _P_POS_MAX)
+        self.P[2, 2] = min(self.P[2, 2], _P_VEL_MAX)
+        self.P[3, 3] = min(self.P[3, 3], _P_VEL_MAX)
 
     @property
     def position(self) -> tuple[float, float]:
@@ -116,22 +126,21 @@ class KalmanTracker:
 
     @property
     def accuracy(self) -> float:
-        """Estimated accuracy from covariance."""
         return float(math.sqrt(self.P[0, 0] + self.P[1, 1]))
 
 
-# ── Session management ──
+# -- session management -------------------------------------------------------
 _trackers: dict[str, KalmanTracker] = {}
 
 
 def get_tracker(session_id: str) -> KalmanTracker:
     if session_id not in _trackers:
         _trackers[session_id] = KalmanTracker()
-        logger.info("[KALMAN] ➕ New tracker for session=%s  (total=%d)", session_id, len(_trackers))
+        logger.info("[KALMAN] New tracker session=%s (total=%d)", session_id, len(_trackers))
     return _trackers[session_id]
 
 
 def remove_tracker(session_id: str):
     removed = _trackers.pop(session_id, None)
     if removed:
-        logger.info("[KALMAN] ➖ Removed tracker for session=%s  (remaining=%d)", session_id, len(_trackers))
+        logger.info("[KALMAN] Removed tracker session=%s (remaining=%d)", session_id, len(_trackers))
