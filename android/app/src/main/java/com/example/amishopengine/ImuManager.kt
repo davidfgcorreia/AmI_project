@@ -41,9 +41,18 @@ class ImuManager(context: Context) : SensorEventListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         } ?: run { android.util.Log.w(TAG, "No rotation vector sensor") }
 
-        sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
-        } ?: run { android.util.Log.w(TAG, "No linear acceleration sensor") }
+        // Prefer hardware step detector (more reliable than manual peak detection)
+        val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+        if (stepDetector != null) {
+            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
+            android.util.Log.i(TAG, "Using TYPE_STEP_DETECTOR")
+        } else {
+            // Fallback to manual peak detection on linear acceleration
+            sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)?.let {
+                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+            } ?: run { android.util.Log.w(TAG, "No step or acceleration sensor") }
+            android.util.Log.i(TAG, "Falling back to linear acceleration step detection")
+        }
     }
 
     fun stop() {
@@ -54,14 +63,19 @@ class ImuManager(context: Context) : SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
 
+            Sensor.TYPE_STEP_DETECTOR -> {
+                // Hardware step detector fires once per step
+                pendingSteps++
+            }
+
             Sensor.TYPE_LINEAR_ACCELERATION -> {
+                // Fallback step detection when TYPE_STEP_DETECTOR is unavailable
                 val mag = sqrt(
                     event.values[0] * event.values[0] +
                     event.values[1] * event.values[1] +
                     event.values[2] * event.values[2]
                 )
                 val now = System.currentTimeMillis()
-                // Simple peak detector: spike above 2.5 m/s², min 300 ms between steps
                 if (mag > 2.5f && now - lastStepMs > 300) {
                     pendingSteps++
                     lastStepMs = now
