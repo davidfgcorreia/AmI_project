@@ -58,6 +58,8 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                     heading = float(data.get("heading", 0.0))
                     steps = int(data.get("steps", 0))
                     dt = float(data.get("dt", 0.2))
+                    logger.info("[IMU] session=%s  heading=%.1f  steps=%d  dt=%.3f",
+                                session_id, heading, steps, dt)
                     csv_log.record_imu(heading, steps)
 
                     if tracker._initialised:
