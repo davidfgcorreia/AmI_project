@@ -116,14 +116,20 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillStyle = COLORS.shelf;
       ctx.strokeStyle = COLORS.shelfStroke;
       ctx.lineWidth = 1;
-      // Draw perfect circle shelf with fixed 1m diameter (0.5m radius)
-      const centerX = tx(s.x, s.y);
-      const centerY = ty(s.x, s.y);
-      const radius = 0.5 * scale; // 0.5 metres -> pixels
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+
+      if (s.shape === 'rect') {
+        ctx.fillRect(sxp, syp, sw, sh);
+        ctx.strokeRect(sxp, syp, sw, sh);
+      } else {
+        // Circle: use average of width/height as diameter
+        const centerX = tx(s.x, s.y);
+        const centerY = ty(s.x, s.y);
+        const radius = ((rw + rh) / 4) * scale;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
 
       ctx.fillStyle = COLORS.text;
       ctx.font = '9px sans-serif';

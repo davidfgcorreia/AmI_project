@@ -18,6 +18,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var bleAdvertiser: BleAdvertiser
     private lateinit var imuManager: ImuManager
     private lateinit var sessionManager: SessionManager
+    private lateinit var speechHelper: SpeechHelper
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
         sessionManager = SessionManager(this)
         bleAdvertiser  = BleAdvertiser(this)
         imuManager     = ImuManager(this)
+        speechHelper   = SpeechHelper(this)
 
         webView = WebView(this).apply {
             settings.apply {
@@ -35,7 +37,14 @@ class MainActivity : ComponentActivity() {
                 mediaPlaybackRequiresUserGesture = false
             }
             webViewClient = WebViewClient()
-            addJavascriptInterface(NativeBridge(sessionManager), "AndroidBridge")
+            addJavascriptInterface(
+                NativeBridge(
+                    sessionManager,
+                    onStartVoice = { runOnUiThread { speechHelper.start(webView) } },
+                    onStopVoice  = { runOnUiThread { speechHelper.stop() } },
+                ),
+                "AndroidBridge"
+            )
         }
         setContentView(webView)
 
@@ -67,10 +76,10 @@ class MainActivity : ComponentActivity() {
 
         // BLE advertising requires BLUETOOTH_CONNECT permission for adapter.setName().
         // Only start if already granted; otherwise wait for the dialog result.
-        if (blePermissionsGranted()) {
+        if (allPermissionsGranted()) {
             bleAdvertiser.start(sessionManager.getOrCreate())
         } else {
-            ActivityCompat.requestPermissions(this, BLE_PERMISSIONS, REQ_BLE)
+            ActivityCompat.requestPermissions(this, ALL_PERMISSIONS, REQ_PERMISSIONS)
         }
     }
 
@@ -78,9 +87,10 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         bleAdvertiser.stop()
         imuManager.stop()
+        speechHelper.destroy()
     }
 
-    private fun blePermissionsGranted() = BLE_PERMISSIONS.all {
+    private fun allPermissionsGranted() = ALL_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -91,7 +101,7 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_BLE && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+        if (requestCode == REQ_PERMISSIONS && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
             bleAdvertiser.start(sessionManager.getOrCreate())
         }
     }
@@ -100,12 +110,13 @@ class MainActivity : ComponentActivity() {
         // ── Change this to your laptop/server IP before building ──────────────
         const val FRONTEND_URL = "http://192.168.1.100:3000"
         // ──────────────────────────────────────────────────────────────────────
-        private const val REQ_BLE = 1
-        private val BLE_PERMISSIONS = arrayOf(
+        private const val REQ_PERMISSIONS = 1
+        private val ALL_PERMISSIONS = arrayOf(
             Manifest.permission.BLUETOOTH_ADVERTISE,
             Manifest.permission.BLUETOOTH_CONNECT,
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.ACTIVITY_RECOGNITION,
+            Manifest.permission.RECORD_AUDIO,
         )
     }
 }

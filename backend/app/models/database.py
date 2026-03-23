@@ -29,6 +29,7 @@ class Shelf(Base):
     y: Mapped[float] = mapped_column()
     width: Mapped[float] = mapped_column(default=1.0)       # metres
     height: Mapped[float] = mapped_column(default=2.0)      # shelf physical height
+    shape: Mapped[str] = mapped_column(String(20), default="circle")  # "circle" or "rect"
     created_at: Mapped[Optional[datetime]] = mapped_column(insert_default=datetime.utcnow)
 
     products: Mapped[List[Product]] = relationship(back_populates="shelf")

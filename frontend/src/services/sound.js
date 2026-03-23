@@ -65,3 +65,29 @@ export function playFile(filename) {
     players[key].play().catch(() => {});
   } catch (e) {}
 }
+
+// ── Text-to-Speech ──────────────────────────────────────────────────────────
+let _ttsSupported = null;
+
+function ttsAvailable() {
+  if (_ttsSupported === null) {
+    _ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  }
+  return _ttsSupported;
+}
+
+export function speak(text) {
+  if (!text || !ttsAvailable()) return;
+  // Cancel any ongoing speech so instructions don't queue up
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 1.0;
+  utt.pitch = 1.0;
+  utt.volume = 1.0;
+  utt.lang = 'en-US';
+  window.speechSynthesis.speak(utt);
+}
+
+export function stopSpeech() {
+  if (ttsAvailable()) window.speechSynthesis.cancel();
+}

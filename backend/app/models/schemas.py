@@ -31,6 +31,7 @@ class ShelfCreate(BaseModel):
     y: float
     width: float = 1.0
     height: float = 2.0
+    shape: str = "circle"  # "circle" or "rect"
 
 
 class ShelfOut(ShelfCreate):

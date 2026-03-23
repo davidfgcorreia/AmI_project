@@ -15,7 +15,11 @@
       "Bash(python -c \"from app.routers.tracking import router; print\\(''OK''\\)\")",
       "Bash(python -c \"from app.services.kalman_fusion import KalmanTracker; t = KalmanTracker\\(\\); t.update_ble\\(4.0, 3.0, -60\\); t.predict_pdr\\(90.0, 2, 0.2\\); t.update_ble\\(4.5, 3.0, -65\\); print\\(f''pos={t.position}, acc={t.accuracy:.2f}''\\); print\\(''OK''\\)\")",
       "Bash(python -c \"from app.main import app; print\\(''OK''\\)\")",
-      "Bash(./gradlew assembleDebug)"
+      "Bash(./gradlew assembleDebug)",
+      "Bash(grep -r p.x_offset --include=*.js --include=*.jsx)",
+      "Bash(python3 -c \"from sqlalchemy import delete; help\\(delete\\)\")",
+      "Bash(python3 -c \"from pydantic import BaseModel; class Test\\(BaseModel\\): x: int; print\\(Test.model_validate.__doc__\\)\")",
+      "Bash(grep -n \"type === ''position''\\\\|type === ''heartbeat''\" /home/goncalo/Documents/IST/p3/AI/AmI_project/frontend/src/services/websocket.js)"
     ]
   }
 }

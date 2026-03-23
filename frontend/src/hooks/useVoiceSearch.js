@@ -1,13 +1,50 @@
 /**
- * useVoiceSearch - Web Speech API integration for hands-free product search.
+ * useVoiceSearch - voice search with native Android bridge preferred,
+ * falling back to Web Speech API in browsers.
  */
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+
+const hasNativeSpeech = () => {
+  try { return !!window.AndroidBridge?.hasNativeSpeech?.(); } catch { return false; }
+};
 
 export default function useVoiceSearch(onResult) {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
+  const onResultRef = useRef(onResult);
+  onResultRef.current = onResult;
+
+  // Listen for native speech results from Android SpeechHelper
+  useEffect(() => {
+    if (!hasNativeSpeech()) return;
+
+    const handler = (e) => {
+      const { transcript, error, listening: isListening } = e.detail;
+      if (isListening) {
+        setListening(true);
+        return;
+      }
+      setListening(false);
+      if (transcript) {
+        onResultRef.current?.(transcript);
+      }
+      if (error) {
+        console.warn('[Voice] Native speech error:', error);
+      }
+    };
+
+    window.addEventListener('nativeSpeech', handler);
+    return () => window.removeEventListener('nativeSpeech', handler);
+  }, []);
 
   const startListening = useCallback(() => {
+    // Prefer native Android speech recognition
+    if (hasNativeSpeech()) {
+      window.AndroidBridge.startVoiceSearch();
+      return;
+    }
+
+    // Fallback: Web Speech API
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -26,7 +63,7 @@ export default function useVoiceSearch(onResult) {
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setListening(false);
-      if (onResult) onResult(transcript);
+      if (onResultRef.current) onResultRef.current(transcript);
     };
 
     recognition.onerror = (event) => {
@@ -38,9 +75,14 @@ export default function useVoiceSearch(onResult) {
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [onResult]);
+  }, []);
 
   const stopListening = useCallback(() => {
+    if (hasNativeSpeech()) {
+      window.AndroidBridge.stopVoiceSearch();
+      setListening(false);
+      return;
+    }
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
