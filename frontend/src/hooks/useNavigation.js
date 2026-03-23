@@ -104,15 +104,41 @@ export default function useNavigation({ userPos, nextItem, path = [], targets = 
       return;
     }
 
-    // Compute turn from current segment to next segment
-    const prevBear = bearing(path[idx - 1] || path[idx], path[idx]);
-    const nextBear = bearing(path[idx], path[nextIdx]);
-    const turn = turnDirection(prevBear, nextBear);
+    // arrival: stop, announce turn direction (left/right), then play item-specific sound
+    if (d <= 1.2 && !announcedRef.current.arrived) {
+      // ensure other sounds stop
+      stopAll();
+      // arrival cue
+      playFile('Para.mp3');
 
-    // Estimate remaining distance
-    let remaining = 0;
-    for (let i = idx; i < path.length - 1; i++) {
-      remaining += dist(path[i], path[i + 1]);
+      // Determine side (right/left) relative to user -> target vector
+      const dx = (target.x ?? 0) - (userPos.x ?? 0);
+      const dy = (target.y ?? 0) - (userPos.y ?? 0);
+      let side;
+      // Use dominant axis to decide lateral side
+      if (Math.abs(dx) > Math.abs(dy)) {
+        side = dx > 0 ? 'right' : 'left';
+      } else {
+        side = dy > 0 ? 'right' : 'left';
+      }
+
+      // play turn cue
+      if (side === 'right') {
+        playFile('TrunRigth.mp3');
+      } else {
+        playFile('TrunLeft.mp3');
+      }
+
+      // play item-specific audio using convention-based filename: item_<id>.mp3
+      try {
+        if (nextItem && nextItem.id) {
+          playFile(`item_${nextItem.id}.mp3`);
+        }
+      } catch (e) {
+        // ignore missing file errors — audio service handles failures silently
+      }
+
+      announcedRef.current.arrived = true;
     }
 
     if (remaining < 3) {
