@@ -32,7 +32,7 @@ class Shelf(Base):
     created_at: Mapped[Optional[datetime]] = mapped_column(insert_default=datetime.utcnow)
 
     products: Mapped[List[Product]] = relationship(back_populates="shelf")
-    images: Mapped[List[ShelfImage]] = relationship(back_populates="shelf")
+    # images relationship removed — shelf images are no longer stored
 
 
 class Product(Base):
@@ -51,13 +51,4 @@ class Product(Base):
     shelf: Mapped[Optional[Shelf]] = relationship(back_populates="products")
 
 
-class ShelfImage(Base):
-    __tablename__ = "shelf_images"
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    shelf_id: Mapped[int] = mapped_column(ForeignKey("shelves.id"))
-    filename: Mapped[str] = mapped_column(String(300))
-    analysis_json: Mapped[str] = mapped_column(Text, default="{}")  # YOLO detections
-    uploaded_at: Mapped[Optional[datetime]] = mapped_column(insert_default=datetime.utcnow)
-
-    shelf: Mapped[Shelf] = relationship(back_populates="images")
+# ShelfImage model removed — application no longer persists shelf images

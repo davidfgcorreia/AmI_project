@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .core.config import STATIC_DIR, SHELF_IMG_DIR
+from .core.config import STATIC_DIR
 from .core.database import engine, SessionLocal, get_db  # noqa: F401
 from .models.database import Base
 
@@ -76,8 +76,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files (shelf images)
-SHELF_IMG_DIR.mkdir(parents=True, exist_ok=True)
+# Static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ── Routers ──
@@ -122,26 +121,19 @@ async def _seed_demo_data():
         with open(SUPERMARKET_JSON, "r", encoding="utf-8") as f:
             catalogue = json.load(f)
 
-        # ── Shelf layout: 3 rows × 5 columns = 15 shelves (one per category) ──
-        # Store is 12×10 m, entrance at y=0, shelves placed in a supermarket grid.
-        # Store is 12×5 m — 3 rows of 5 shelves, y compressed to fit
+        # ── Shelf layout: 2 rows × 4 columns = 8 shelves (one per category) ──
+        # Store is 10×5 m. Shelves placed in a 2×4 grid across the floor.
+        # Columns spaced evenly across width (10 m), rows across height (5 m).
         SHELF_DEFS = [
             # (category_key,           display_name,            aisle, x,    y   )
-            ("dairy",                  "Dairy & Eggs",           "1",   1.5,  1.2),
-            ("juices",                 "Juices & Drinks",        "1",   4.0,  1.2),
-            ("bakery",                 "Bakery",                 "1",   6.5,  1.2),
-            ("meat_and_fish",          "Meat & Fish",            "1",   9.0,  1.2),
-            ("beverages",              "Beverages",              "1",  11.0,  1.2),
-            ("fruits",                 "Fresh Fruits",           "2",   1.5,  2.5),
-            ("vegetables",             "Fresh Vegetables",       "2",   4.0,  2.5),
-            ("snacks_and_chips",       "Snacks & Chips",         "2",   6.5,  2.5),
-            ("cereals_and_breakfast",  "Cereals & Breakfast",    "2",   9.0,  2.5),
-            ("frozen_foods",           "Frozen Foods",           "2",  11.0,  2.5),
-            ("canned_goods",           "Canned Goods",           "3",   1.5,  4.0),
-            ("condiments_and_sauces",  "Condiments & Sauces",    "3",   4.0,  4.0),
-            ("pasta_and_rice",         "Pasta & Rice",           "3",   6.5,  4.0),
-            ("personal_care",          "Personal Care",          "3",   9.0,  4.0),
-            ("cleaning_products",      "Cleaning Products",      "3",  11.0,  4.0),
+            ("dairy",                  "Dairy & Eggs",           "1",   1.25,  1.25),
+            ("juices",                 "Juices & Drinks",        "1",   3.75,  1.25),
+            ("bakery",                 "Bakery",                 "1",   6.25,  1.25),
+            ("meat_and_fish",          "Meat & Fish",            "1",   8.75,  1.25),
+            ("beverages",              "Beverages",              "2",   1.25,  3.75),
+            ("fruits",                 "Fresh Fruits",           "2",   3.75,  3.75),
+            ("vegetables",             "Fresh Vegetables",       "2",   6.25,  3.75),
+            ("snacks_and_chips",       "Snacks & Chips",         "2",   8.75,  3.75),
         ]
 
         # Price ranges per category (min, max) in €
@@ -180,16 +172,24 @@ async def _seed_demo_data():
         await db.flush()  # assign IDs
 
         # ── Insert products ──
+        # Distribute products along the shelf width using `x_offset` (metres
+        # relative to shelf centre). Also assign shelf_level cyclically.
         products = []
         for shelf_obj, (cat_key, display_name, *_) in zip(shelves, SHELF_DEFS):
             items = catalogue.get(cat_key, [])
+            count = len(items)
             for idx, item_name in enumerate(items):
+                # fraction along shelf [0..1]
+                frac = (idx / (count - 1)) if count > 1 else 0.5
+                # place within ±40% of shelf width to avoid edges
+                x_offset = (frac - 0.5) * (shelf_obj.width * 0.8)
                 products.append(Product(
                     name=item_name,
                     category=display_name,
                     price=make_price(cat_key, item_name),
                     shelf_id=shelf_obj.id,
                     shelf_level=(idx % 4) + 1,  # cycle levels 1-4
+                    x_offset=round(x_offset, 3),
                 ))
         db.add_all(products)
         await db.commit()

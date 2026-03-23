@@ -1,4 +1,4 @@
-from .database import Base, Product, Shelf, ShelfImage
+from .database import Base, Product, Shelf
 from .schemas import (
     ProductCreate, ProductOut, ShelfCreate, ShelfOut,
     BLEReading, IMUData, Position, NavigateRequest, NavigateResponse,
@@ -6,7 +6,7 @@ from .schemas import (
 )
 
 __all__ = [
-    "Base", "Product", "Shelf", "ShelfImage",
+    "Base", "Product", "Shelf",
     "ProductCreate", "ProductOut", "ShelfCreate", "ShelfOut",
     "BLEReading", "IMUData", "Position", "NavigateRequest", "NavigateResponse",
     "NavStep", "ShelfAnalysis",

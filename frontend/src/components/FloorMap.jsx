@@ -8,8 +8,11 @@
  */
 import { useRef, useEffect, useCallback } from 'react';
 
-const REAL_W = 8;    // metres (physical width)
-const REAL_H = 5.5;  // metres (physical height)
+// Physical store dimensions in metres. Keep REAL_W/REAL_H = 10×5 rotated
+// so the displayed coordinate space is 5×10 (portrait) while the real
+// store is 10m wide × 5m high.
+const REAL_W = 10;    // metres (physical width)
+const REAL_H = 5;     // metres (physical height)
 // Rotate 90° for portrait phones: map long axis runs vertically
 const ROTATED = true;
 const STORE_W = ROTATED ? REAL_H : REAL_W;
@@ -113,8 +116,14 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillStyle = COLORS.shelf;
       ctx.strokeStyle = COLORS.shelfStroke;
       ctx.lineWidth = 1;
-      ctx.fillRect(sxp, syp, sw, sh);
-      ctx.strokeRect(sxp, syp, sw, sh);
+      // Draw perfect circle shelf with fixed 1m diameter (0.5m radius)
+      const centerX = tx(s.x, s.y);
+      const centerY = ty(s.x, s.y);
+      const radius = 0.5 * scale; // 0.5 metres -> pixels
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
       ctx.fillStyle = COLORS.text;
       ctx.font = '9px sans-serif';

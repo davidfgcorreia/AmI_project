@@ -7,7 +7,6 @@ from pathlib import Path
 # ── Paths ──
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "app" / "static"
-SHELF_IMG_DIR = STATIC_DIR / "shelf_images"
 PROJECT_ROOT = BASE_DIR.parent.parent
 SUPERMARKET_JSON = PROJECT_ROOT / "supermarket.json"
 
@@ -21,7 +20,7 @@ MQTT_TOPIC_BLE = "ire/ble/rssi"          # ESP32 publishes here
 GATEWAY_POSITIONS = {
     "esp32_A": (4, 1),   # centre-bottom
     "esp32_B": (0.5, 5),  # top-right
-    "esp32_C": (7.5, 4.5),   # top-left
+    "esp32_C": (9, 4.5),   # top-left
     # NOTE: B and C share y=4.5 — Y-resolution near the top wall is reduced.
     # If placement can be adjusted, move one gateway to a different Y for a
     # better-conditioned triangle.
@@ -51,8 +50,8 @@ KALMAN_MEASUREMENT_NOISE = 1.5
 HEADING_OFFSET = 0.0
 
 # ── Navigation ──
-STORE_WIDTH = 8        # metres  (must match FloorMap.jsx STORE_W)
-STORE_HEIGHT = 5.5        # metres  (must match FloorMap.jsx STORE_H)
+STORE_WIDTH = 10        # metres  (must match FloorMap.jsx STORE_W)
+STORE_HEIGHT = 5        # metres  (must match FloorMap.jsx STORE_H)
 GRID_RESOLUTION = 0.25      # metres per grid cell
 
 
