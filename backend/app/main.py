@@ -85,10 +85,12 @@ from .routers.products import router as products_router    # noqa: E402
 from .routers.navigation import router as nav_router       # noqa: E402
 from .routers.tracking import router as tracking_router    # noqa: E402
 from .routers.gateways import router as gateways_router    # noqa: E402
+from .routers.audio_files import router as audio_router    # noqa: E402
 app.include_router(products_router)
 app.include_router(nav_router)
 app.include_router(tracking_router)
 app.include_router(gateways_router)
+app.include_router(audio_router)
 
 
 # ── Health check ──

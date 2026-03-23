@@ -12,10 +12,12 @@ import SearchBar from './components/SearchBar';
 import ProductList from './components/ProductList';
 import NavQueue from './components/NavQueue';
 import StatusBar from './components/StatusBar';
+import VoiceMenu from './components/VoiceMenu';
 import { getProducts, getShelves, getGateways, navigate as apiNavigate } from './services/api';
 import { connectTracking, disconnectTracking, connectGateways, disconnectGateways } from './services/websocket';
 import { getOrCreateSessionId, startBleAdvertising, stopBleAdvertising } from './services/ble';
 import useIMU from './hooks/useIMU';
+import useNavigation from './hooks/useNavigation';
 
 export default function App() {
   const [tab, setTab] = useState('map');
@@ -25,6 +27,9 @@ export default function App() {
   const [beacons, setBeacons] = useState([]);
   const [products, setProducts] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(() => {
+    try { return localStorage.getItem('ire_voice_enabled') !== 'false'; } catch (e) { return true; }
+  });
 
   const [queue, setQueue] = useState([]);
   const [navPath, setNavPath] = useState([]);
@@ -147,6 +152,9 @@ export default function App() {
   const nextItem = pending[0] ?? null;
   const pendingCount = pending.length;
 
+  // speak navigation instructions based on position and next target
+  useNavigation({ userPos, nextItem, targets: navTargets, voiceEnabled });
+
   const [editingSession, setEditingSession] = useState(false);
   const [sessionInput, setSessionInput] = useState('');
 
@@ -192,6 +200,21 @@ export default function App() {
               {sessionId ?? '…'}
             </span>
           )}
+          <VoiceMenu
+            nextItem={nextItem ? { ...nextItem, x: navTargets[0]?.x, y: navTargets[0]?.y } : null}
+            userPos={userPos}
+          />
+          <button
+            onClick={() => {
+              const next = !voiceEnabled;
+              try { localStorage.setItem('ire_voice_enabled', String(next)); } catch (e) {}
+              setVoiceEnabled(next);
+            }}
+            title={voiceEnabled ? 'Disable voice guidance' : 'Enable voice guidance'}
+            style={{ fontSize: '0.9rem', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #ccc', background: 'transparent', cursor: 'pointer' }}
+          >
+            {voiceEnabled ? '🔊' : '🔈'}
+          </button>
           <StatusBar connected={wsConnected} accuracy={userPos?.accuracy} />
         </div>
       </header>
