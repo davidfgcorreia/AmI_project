@@ -27,6 +27,7 @@ const COLORS = {
   path: '#1a73e8',
   user: '#1a73e8',
   userGlow: 'rgba(26,115,232,0.2)',
+  userCell: 'rgba(26,115,232,0.12)',
   target: '#ea4335',
   text: '#37474f',
 };
@@ -49,6 +50,7 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     const W = rectRef.current.width;
     const H = rectRef.current.height;
     const { shelves, userPos, path, targets, beacons } = dataRef.current;
+    const displayPos = dataRef.current.userPos;
 
     const sx = W / STORE_W;
     const sy = H / STORE_H;
@@ -187,19 +189,55 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillText(b.id, tx(b.x, b.y) + 8, ty(b.x, b.y) + 4);
     });
 
-    // Navigation path — display only the segment to the next item (first leg)
-    if (path.length > 1) {
-      const displayPath = path.length >= 2 ? [path[0], path[1]] : path;
-      ctx.strokeStyle = COLORS.path;
-      ctx.lineWidth = 3;
-      ctx.setLineDash([8, 4]);
-      ctx.beginPath();
-      ctx.moveTo(tx(displayPath[0].x, displayPath[0].y), ty(displayPath[0].x, displayPath[0].y));
-      for (let i = 1; i < displayPath.length; i++) {
-        ctx.lineTo(tx(displayPath[i].x, displayPath[i].y), ty(displayPath[i].x, displayPath[i].y));
+    // Navigation path — draw a route from the centre of the user's cell
+    // to the centre of the cell closest to the next shelf, then to the shelf.
+    if (targets && targets.length) {
+      const shelf = targets[0];
+      // determine user start: prefer snapped cell centre from displayPos
+      let start = null;
+      if (displayPos) {
+        const snappedY = centerY;
+        const ux = displayPos.x;
+        const uy = snappedY;
+        const cellX = Math.max(0, Math.min(Math.floor(ux), REAL_W - 1));
+        const cellY = Math.max(0, Math.min(Math.floor(uy), REAL_H - 1));
+        start = { x: cellX + 0.5, y: cellY + 0.5 };
+      } else if (path && path.length) {
+        start = path[0];
       }
-      ctx.stroke();
-      ctx.setLineDash([]);
+
+      // Build an L-shaped path: horizontal first (same Y as user), then
+      // vertical to the shelf. Midpoint is at (shelf.x, user.y) snapped
+      // to the centre of the corresponding grid cell.
+      let shelfCellCentre = null;
+      if (start) {
+        const midCellX = Math.max(0, Math.min(Math.floor(shelf.x), REAL_W - 1));
+        const midCellY = Math.max(0, Math.min(Math.floor(start.y), REAL_H - 1));
+        shelfCellCentre = { x: midCellX + 0.5, y: midCellY + 0.5 };
+      } else {
+        const midCellX = Math.max(0, Math.min(Math.floor(shelf.x), REAL_W - 1));
+        const midCellY = Math.max(0, Math.min(Math.floor(shelf.y), REAL_H - 1));
+        shelfCellCentre = { x: midCellX + 0.5, y: midCellY + 0.5 };
+      }
+
+      // build displayPath: start -> shelfCellCentre -> shelf
+      const displayPath = [];
+      if (start) displayPath.push(start);
+      displayPath.push(shelfCellCentre);
+      displayPath.push({ x: shelf.x, y: shelf.y });
+
+      if (displayPath.length > 1) {
+        ctx.strokeStyle = COLORS.path;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 4]);
+        ctx.beginPath();
+        ctx.moveTo(tx(displayPath[0].x, displayPath[0].y), ty(displayPath[0].x, displayPath[0].y));
+        for (let i = 1; i < displayPath.length; i++) {
+          ctx.lineTo(tx(displayPath[i].x, displayPath[i].y), ty(displayPath[i].x, displayPath[i].y));
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
 
     // Target markers — show only the next target (first element)
@@ -215,27 +253,36 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillText('★', tx(t.x, t.y), ty(t.x, t.y) + 4);
     }
 
-    // User position — snap to centre aisle Y (they walk along the aisle band).
-    const displayPos = dataRef.current.userPos;
+      // User position — snap to centre aisle Y and fill the grid cell containing
+      // the user's (snapped) coordinates instead of drawing a dot.
     if (displayPos) {
-      // enforce centre Y
-      const snappedY = centerY;
-      const px = displayPos.x;
-      const py = snappedY;
-      const accRadius = ((displayPos.accuracy || 1.5) * scale);
+      const snappedY = centerY; // keep user constrained to aisle band
+      const ux = displayPos.x;
+      const uy = snappedY;
 
-      ctx.fillStyle = COLORS.userGlow;
-      ctx.beginPath();
-      ctx.arc(tx(px, py), ty(px, py), accRadius, 0, Math.PI * 2);
-      ctx.fill();
+      // Determine integer grid cell containing (ux, uy). Clamp to store bounds.
+      const cellX = Math.max(0, Math.min(Math.floor(ux), REAL_W - 1));
+      const cellY = Math.max(0, Math.min(Math.floor(uy), REAL_H - 1));
 
-      ctx.fillStyle = COLORS.user;
-      ctx.beginPath();
-      ctx.arc(tx(px, py), ty(px, py), 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      // Map the four corners of the cell to screen space and fill the rectangle.
+      const corners = [
+        { x: cellX, y: cellY },
+        { x: cellX + 1, y: cellY },
+        { x: cellX, y: cellY + 1 },
+        { x: cellX + 1, y: cellY + 1 },
+      ];
+      const pts = corners.map(c => ({ sx: tx(c.x, c.y), sy: ty(c.x, c.y) }));
+      const minX = Math.min(...pts.map(p => p.sx));
+      const maxX = Math.max(...pts.map(p => p.sx));
+      const minY = Math.min(...pts.map(p => p.sy));
+      const maxY = Math.max(...pts.map(p => p.sy));
+
+      ctx.fillStyle = COLORS.userCell;
+      ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+      // subtle border to separate the cell from grid lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(minX + 0.5, minY + 0.5, maxX - minX - 1, maxY - minY - 1);
     }
 
     animRef.current = requestAnimationFrame(draw);

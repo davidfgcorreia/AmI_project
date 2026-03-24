@@ -15,11 +15,11 @@
   --accent: var(--palette-4);
 
   --text: #202124;
-  --text-secondary: #5f6368;
+  --text-secondary: #36383b;
   --border: #dadce0;
   --success: #34a853;
   --warning: #fbbc04;
-  --danger: #ea4335;
+  --danger: #a02f25;
   --radius: 12px;
   /* Safe area insets for notch / home indicator */
   --safe-top: env(safe-area-inset-top, 0px);

@@ -68,6 +68,61 @@ export default function App() {
     };
   }, [sessionId]);
 
+  // Dev helper: expose a global function to simulate user position from the
+  // browser console. Only active in non-production environments.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    // attach helper
+    window.__simulateUserPos = (pos) => {
+      try {
+        if (!pos || typeof pos !== 'object') return console.warn('provide {x,y,accuracy}');
+        setUserPos({ x: Number(pos.x) || 0, y: Number(pos.y) || 0, accuracy: Number(pos.accuracy) || 1.5 });
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    window.__clearSim = () => setUserPos(null);
+    return () => {
+      try { delete window.__simulateUserPos; delete window.__clearSim; } catch (e) {}
+    };
+  }, []);
+
+  // Dev oscillation helper: oscillate user along the aisle (X axis) between
+  // minX and maxX. Call `window.__oscillateUserAisle({minX, maxX, periodMs})`.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    let oscTimer = null;
+    // store constants matching FloorMap
+    const REAL_W = 10;
+    const REAL_H = 5;
+    const centreY = REAL_H / 2;
+
+    window.__oscillateUserAisle = (opts = {}) => {
+      const minX = Number(opts.minX ?? 0.5);
+      const maxX = Number(opts.maxX ?? (REAL_W - 0.5));
+      const period = Number(opts.periodMs ?? 4000); // ms for full cycle
+      if (oscTimer) clearInterval(oscTimer);
+      const stepMs = 50;
+      const start = performance.now();
+      oscTimer = setInterval(() => {
+        const t = performance.now();
+        const phase = ((t - start) % period) / period; // 0..1
+        // sin-based smooth back-and-forth in [minX..maxX]
+        const x = minX + (maxX - minX) * 0.5 * (1 + Math.sin(2 * Math.PI * phase - Math.PI / 2));
+        setUserPos({ x, y: centreY, accuracy: 1.0 });
+      }, stepMs);
+      // convenience stop function
+      window.__stopOscillate = () => {
+        if (oscTimer) { clearInterval(oscTimer); oscTimer = null; }
+      };
+      return window.__stopOscillate;
+    };
+
+    return () => {
+      try { if (oscTimer) clearInterval(oscTimer); delete window.__oscillateUserAisle; delete window.__stopOscillate; } catch (e) {}
+    };
+  }, []);
+
   // When there is no session (e.g. during dev or before a user connects),
   // default the displayed user position to the store center so the map
   // shows a sensible location. These values match FloorMap's REAL_W/REAL_H.
