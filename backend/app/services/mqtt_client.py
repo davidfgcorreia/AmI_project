@@ -120,6 +120,9 @@ async def mqtt_listener():
                         continue
                     if sid is None or gw is None:
                         continue
+                    # Only accept readings from our app (session names start with "IRE-")
+                    if not sid.startswith("IRE-"):
+                        continue
 
                     update_ble_reading(sid, gw, rssi)
                     logger.info("[MQTT] gw=%s  session=%s  rssi=%+.1f dBm", gw, sid, rssi)
