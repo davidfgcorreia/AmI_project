@@ -58,25 +58,21 @@ export default function useNavigation({ userPos, nextItem, path = [], targets = 
     }
   }, [nextItem?.id]);
 
-  // Announce product name as soon as it's queued (no position needed)
+  // Announce product name once targets are ready
   useEffect(() => {
-    console.log('[NAV] start check:', { voiceEnabled, nextItem: nextItem?.name, announced: announcedStartRef.current });
     if (!voiceEnabled || !nextItem) return;
     if (announcedStartRef.current) return;
-    announcedStartRef.current = true;
 
     const target = targets?.[0];
-    console.log('[NAV] announcing start:', nextItem.name, { userPos, target });
     if (userPos && target) {
+      announcedStartRef.current = true;
       const d = Math.round(dist(userPos, target));
       speak(`Navigating to ${nextItem.name}, about ${d} metres away.`);
-    } else {
-      speak(`Navigating to ${nextItem.name}.`);
+      lastSpokeRef.current = Date.now() / 1000;
+      waypointIdxRef.current = 1;
     }
-    lastSpokeRef.current = Date.now() / 1000;
-    waypointIdxRef.current = 1;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nextItem?.id, voiceEnabled]);
+  }, [nextItem?.id, targets?.length, userPos?.x, userPos?.y, voiceEnabled]);
 
   // Turn-by-turn on position updates
   useEffect(() => {
