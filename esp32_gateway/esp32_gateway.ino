@@ -78,9 +78,10 @@ class ScanCallback : public BLEAdvertisedDeviceCallbacks {
     int rssi = device.getRSSI();
 
     // Use the advertised device name as session_id (set by the Android app).
-    // Fall back to MAC address if the name is not present.
+    // Only accept devices whose name starts with "IRE-" (our app's prefix).
     String name = device.getName().c_str();
-    String sessionId = (name.length() > 0) ? name : device.getAddress().toString().c_str();
+    if (!name.startsWith("IRE-")) return;
+    String sessionId = name;
 
     String payload = "{\"gateway_id\":\"" + String(GATEWAY_ID)
                    + "\",\"session_id\":\"" + sessionId
