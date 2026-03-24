@@ -1,9 +1,10 @@
 /**
  * useNavigation - turn-by-turn audio navigation using TTS.
  *
- * Analyses the A* path to compute turn directions (left / right / straight)
- * and announces them as the user approaches each waypoint.  On arrival at
- * a target shelf it announces the product name and shelf level.
+ * Runs on every position update (~10 Hz) to give responsive audio cues.
+ * Tracks which path waypoint the user is heading toward and announces
+ * turns as they reach each one. On arrival at the target shelf it
+ * announces the product name and shelf level.
  */
 import { useEffect, useRef } from 'react';
 import { speak, stopSpeech } from '../services/sound';
@@ -39,19 +40,23 @@ function turnDirection(fromBearing, toBearing) {
 const LEVEL_NAMES = ['bottom', 'lower', 'middle', 'upper', 'top'];
 function levelName(n) { return LEVEL_NAMES[(n || 1) - 1] || `level ${n}`; }
 
+function capitalise(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
 // How close (metres) the user must be to a waypoint to trigger the next instruction
 const WAYPOINT_RADIUS = 1.5;
 // How close to the target shelf to announce arrival
 const ARRIVAL_RADIUS = 1.8;
+// Minimum seconds between spoken instructions to avoid spamming
+const MIN_SPEAK_INTERVAL = 2.0;
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export default function useNavigation({ userPos, nextItem, path = [], targets = [], voiceEnabled = true }) {
-  // Index of the path waypoint the user is currently heading toward
   const waypointIdxRef = useRef(0);
   const announcedStartRef = useRef(false);
   const arrivedRef = useRef(false);
   const lastItemIdRef = useRef(null);
+  const lastSpokeRef = useRef(0);
 
   // Reset when the target product changes
   useEffect(() => {
@@ -63,6 +68,7 @@ export default function useNavigation({ userPos, nextItem, path = [], targets = 
     }
   }, [nextItem?.id]);
 
+  // Main navigation loop — runs on every position update
   useEffect(() => {
     if (!voiceEnabled) { stopSpeech(); return; }
     if (!userPos || !nextItem || path.length < 2) return;
@@ -70,21 +76,32 @@ export default function useNavigation({ userPos, nextItem, path = [], targets = 
     const target = targets?.[0];
     if (!target) return;
 
+    const now = Date.now() / 1000;
+    const canSpeak = (now - lastSpokeRef.current) >= MIN_SPEAK_INTERVAL;
+
+    function say(text) {
+      if (!canSpeak) return;
+      speak(text);
+      lastSpokeRef.current = now;
+    }
+
     // ── Arrival check ────────────────────────────────────────────────────
     const dTarget = dist(userPos, target);
     if (dTarget <= ARRIVAL_RADIUS && !arrivedRef.current) {
       arrivedRef.current = true;
       const level = levelName(nextItem.shelf_level);
       speak(`You have arrived. ${nextItem.name} is on the ${level} shelf.`);
+      lastSpokeRef.current = now;
       return;
     }
-    if (arrivedRef.current) return; // already arrived, wait for next item
+    if (arrivedRef.current) return;
 
     // ── Start announcement ───────────────────────────────────────────────
     if (!announcedStartRef.current) {
       announcedStartRef.current = true;
       const remaining = Math.round(dTarget);
       speak(`Navigating to ${nextItem.name}, about ${remaining} metres away.`);
+      lastSpokeRef.current = now;
       waypointIdxRef.current = 1;
       return;
     }
@@ -96,7 +113,7 @@ export default function useNavigation({ userPos, nextItem, path = [], targets = 
     const dWaypoint = dist(userPos, path[idx]);
     if (dWaypoint > WAYPOINT_RADIUS) return; // not there yet
 
-    // User reached waypoint idx — advance and announce next turn
+    // User reached waypoint — advance and announce next turn
     const nextIdx = idx + 1;
     if (nextIdx >= path.length) {
       // Last waypoint is the target — arrival will be handled above
@@ -104,62 +121,20 @@ export default function useNavigation({ userPos, nextItem, path = [], targets = 
       return;
     }
 
-    // arrival: stop, announce turn direction (left/right), then play item-specific sound
-    if (d <= 1.2 && !announcedRef.current.arrived) {
-      // ensure other sounds stop
-      stopAll();
-      // arrival cue
-      playFile('Para.mp3');
+    // Compute turn direction from current segment to next segment
+    const fromBear = bearing(path[idx - 1], path[idx]);
+    const toBear = bearing(path[idx], path[nextIdx]);
+    const turn = turnDirection(fromBear, toBear);
 
-      // Determine side (right/left) relative to user -> target vector
-      const dx = (target.x ?? 0) - (userPos.x ?? 0);
-      const dy = (target.y ?? 0) - (userPos.y ?? 0);
-      let side;
-      // Use dominant axis to decide lateral side
-      if (Math.abs(dx) > Math.abs(dy)) {
-        side = dx > 0 ? 'right' : 'left';
-      } else {
-        side = dy > 0 ? 'right' : 'left';
-      }
-
-      // play turn cue
-      if (side === 'right') {
-        playFile('TrunRigth.mp3');
-      } else {
-        playFile('TrunLeft.mp3');
-      }
-
-      // play item-specific audio using convention-based filename: item_<id>.mp3
-      try {
-        if (nextItem && nextItem.id) {
-          playFile(`item_${nextItem.id}.mp3`);
-        }
-      } catch (e) {
-        // ignore missing file errors — audio service handles failures silently
-      }
-
-      announcedRef.current.arrived = true;
-    }
-
-    if (remaining < 3) {
-      speak(`${capitalise(turn)}, almost there.`);
+    const waypointsLeft = path.length - nextIdx;
+    if (waypointsLeft <= 2) {
+      say(`${capitalise(turn)}, almost there.`);
     } else {
-      speak(`${capitalise(turn)}.`);
+      say(`${capitalise(turn)}.`);
     }
 
     waypointIdxRef.current = nextIdx;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userPos?.x, userPos?.y, nextItem?.id, path.length, voiceEnabled]);
-}
-
-// ── Small helpers ────────────────────────────────────────────────────────────
-
-function compassWord(deg) {
-  const dirs = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
-  return dirs[Math.round(deg / 45) % 8];
-}
-
-function capitalise(s) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
