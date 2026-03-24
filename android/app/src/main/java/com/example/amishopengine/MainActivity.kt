@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         // ── Change this to your laptop/server IP before building ──────────────
-        const val FRONTEND_URL = "http://192.168.1.100:3000"
+        const val FRONTEND_URL = "http://192.168.100.222:3000"
         // ──────────────────────────────────────────────────────────────────────
         private const val REQ_PERMISSIONS = 1
         private val ALL_PERMISSIONS = arrayOf(

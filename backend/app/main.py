@@ -200,13 +200,14 @@ async def _seed_demo_data():
 async def _register_shelf_obstacles():
     """Load all shelves from DB and mark them on the pathfinding grid."""
     from .models.database import Shelf
-    from .services.pathfinding import register_obstacle
+    from .services.pathfinding import register_obstacle, clear_obstacles
     from sqlalchemy import select
 
     async with SessionLocal() as db:
         result = await db.execute(select(Shelf))
         shelves = result.scalars().all()
 
+    clear_obstacles()
     for s in shelves:
         register_obstacle(float(s.x), float(s.y), float(s.width), float(s.height))
     logger.info("Registered %d shelf obstacles on pathfinding grid", len(shelves))

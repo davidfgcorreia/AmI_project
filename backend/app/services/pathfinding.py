@@ -32,18 +32,26 @@ def grid_to_world(row: int, col: int) -> tuple[float, float]:
            row * GRID_RESOLUTION + GRID_RESOLUTION / 2
 
 
+def clear_obstacles():
+    """Reset the obstacle grid to fully walkable."""
+    for r in range(ROWS):
+        for c in range(COLS):
+            _obstacle_grid[r][c] = 0
+    logger.info("[PATH] Obstacle grid cleared")
+
+
 def register_obstacle(x: float, y: float, w: float = 1.0, h: float = 1.0):
     """Mark shelf footprint as obstacles on the grid (with margin)."""
     margin = GRID_RESOLUTION
-    x0, y0 = world_to_grid(x - w / 2 - margin, y - h / 2 - margin)
-    x1, y1 = world_to_grid(x + w / 2 + margin, y + h / 2 + margin)
+    r0, c0 = world_to_grid(x - w / 2 - margin, y - h / 2 - margin)
+    r1, c1 = world_to_grid(x + w / 2 + margin, y + h / 2 + margin)
     cells = 0
-    for r in range(min(x0, x1), max(x0, x1) + 1):
-        for c in range(min(y0, y1), max(y0, y1) + 1):
+    for r in range(min(r0, r1), max(r0, r1) + 1):
+        for c in range(min(c0, c1), max(c0, c1) + 1):
             if 0 <= r < ROWS and 0 <= c < COLS:
                 _obstacle_grid[r][c] = 1
                 cells += 1
-    logger.info("[PATH] 🧱 Obstacle at (%.1f, %.1f) size %.1f×%.1f → %d grid cells blocked", x, y, w, h, cells)
+    logger.info("[PATH] Obstacle at (%.1f, %.1f) size %.1f×%.1f → %d grid cells blocked", x, y, w, h, cells)
 
 
 def _heuristic(a: tuple[int, int], b: tuple[int, int]) -> float:

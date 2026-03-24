@@ -107,14 +107,22 @@ async def list_shelves(db: AsyncSession = Depends(get_db)):
     return items
 
 
+async def _rebuild_obstacle_grid(db: AsyncSession):
+    """Clear and re-register all shelf obstacles on the pathfinding grid."""
+    from ..services.pathfinding import register_obstacle, clear_obstacles
+    clear_obstacles()
+    result = await db.execute(select(Shelf))
+    for s in result.scalars().all():
+        register_obstacle(float(s.x), float(s.y), float(s.width), float(s.height))
+
+
 @router.post("/shelves", response_model=ShelfOut, status_code=201)
 async def create_shelf(body: ShelfCreate, db: AsyncSession = Depends(get_db)):
     s = Shelf(**body.model_dump())
     db.add(s)
     await db.commit()
     await db.refresh(s)
-    from ..services.pathfinding import register_obstacle
-    register_obstacle(float(s.x), float(s.y), float(s.width), float(s.height))
+    await _rebuild_obstacle_grid(db)
     logger.info("[SHELVES] Created shelf id=%d '%s' at (%.1f, %.1f)", s.id, s.name, s.x, s.y)
     return s
 
@@ -129,8 +137,7 @@ async def update_shelf(shelf_id: int, body: ShelfCreate, db: AsyncSession = Depe
         setattr(s, k, v)
     await db.commit()
     await db.refresh(s)
-    from ..services.pathfinding import register_obstacle
-    register_obstacle(float(s.x), float(s.y), float(s.width), float(s.height))
+    await _rebuild_obstacle_grid(db)
     return s
 
 
@@ -146,3 +153,4 @@ async def delete_shelf(shelf_id: int, db: AsyncSession = Depends(get_db)):
         p.shelf_id = None
     await db.delete(s)
     await db.commit()
+    await _rebuild_obstacle_grid(db)
