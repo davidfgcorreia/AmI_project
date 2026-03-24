@@ -9,6 +9,18 @@ export default function PaletteEditor() {
     Theme.applyPalette(colors);
   }, [colors]);
 
+  // Auto-save palette when changed (debounced) so current colorway persists
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        Theme.savePalette(colors);
+      } catch (e) {
+        console.error('Auto-save palette failed', e);
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [colors]);
+
   const onChange = (idx, value) => {
     const next = colors.slice();
     next[idx] = value;

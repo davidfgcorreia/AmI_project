@@ -187,10 +187,9 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillText(b.id, tx(b.x, b.y) + 8, ty(b.x, b.y) + 4);
     });
 
-    // Navigation path — project path onto the centre aisle (horizontal band)
+    // Navigation path — display only the segment to the next item (first leg)
     if (path.length > 1) {
-      const displayY = centerY; // snap Y to centre aisle
-      const displayPath = path.map(p => ({ x: p.x, y: displayY }));
+      const displayPath = path.length >= 2 ? [path[0], path[1]] : path;
       ctx.strokeStyle = COLORS.path;
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 4]);
@@ -203,18 +202,18 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.setLineDash([]);
     }
 
-    // Target markers — project visible targets onto the centre aisle Y
-    targets.forEach((t) => {
-      const dt = { x: t.x, y: centerY };
+    // Target markers — show only the next target (first element)
+    if (targets && targets.length) {
+      const t = targets[0];
       ctx.fillStyle = COLORS.target;
       ctx.beginPath();
-      ctx.arc(tx(dt.x, dt.y), ty(dt.x, dt.y), 8, 0, Math.PI * 2);
+      ctx.arc(tx(t.x, t.y), ty(t.x, t.y), 8, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('★', tx(dt.x, dt.y), ty(dt.x, dt.y) + 4);
-    });
+      ctx.fillText('★', tx(t.x, t.y), ty(t.x, t.y) + 4);
+    }
 
     // User position — snap to centre aisle Y (they walk along the aisle band).
     const displayPos = dataRef.current.userPos;
