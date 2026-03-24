@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -11,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
@@ -19,6 +21,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var imuManager: ImuManager
     private lateinit var sessionManager: SessionManager
     private lateinit var speechHelper: SpeechHelper
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,6 +32,13 @@ class MainActivity : ComponentActivity() {
         bleAdvertiser  = BleAdvertiser(this)
         imuManager     = ImuManager(this)
         speechHelper   = SpeechHelper(this)
+
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.US
+                ttsReady = true
+            }
+        }
 
         webView = WebView(this).apply {
             settings.apply {
@@ -42,6 +53,14 @@ class MainActivity : ComponentActivity() {
                     sessionManager,
                     onStartVoice = { runOnUiThread { speechHelper.start(webView) } },
                     onStopVoice  = { runOnUiThread { speechHelper.stop() } },
+                    onSpeak      = { text ->
+                        if (ttsReady) {
+                            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nav")
+                        }
+                    },
+                    onStopSpeech = {
+                        if (ttsReady) tts?.stop()
+                    },
                 ),
                 "AndroidBridge"
             )
@@ -88,6 +107,8 @@ class MainActivity : ComponentActivity() {
         bleAdvertiser.stop()
         imuManager.stop()
         speechHelper.destroy()
+        tts?.stop()
+        tts?.shutdown()
     }
 
     private fun allPermissionsGranted() = ALL_PERMISSIONS.all {

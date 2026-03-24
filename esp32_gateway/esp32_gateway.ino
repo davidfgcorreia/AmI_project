@@ -1,16 +1,8 @@
 /*
- * ESP32 BLE Gateway - Intelligent Retail Ecosystem
+ * ESP32 BLE Gateway – Intelligent Retail Ecosystem
  * ─────────────────────────────────────────────────
- * Scans for BLE devices advertising the IRE service UUID,
- * extracts RSSI, and publishes to MQTT broker.
- *
- * The Android app continuously advertises with:
- *   - Service UUID: 6e400001-b5a3-f393-e0a9-e50e24dcca9e
- *   - Device name:  session_id (e.g. "IRE-a3b4c5d6")
- *
- * Session ID priority:
- *   1. BLE advertisement name  (set by the Android app)
- *   2. BLE MAC address         (fallback)
+ * Scans for BLE devices, extracts RSSI,
+ * and publishes to MQTT broker.
  *
  * Requirements:
  *   - ESP32 board package in Arduino IDE
@@ -26,30 +18,40 @@
 #include <BLEAdvertisedDevice.h>
 
 // ── CONFIGURATION ───────────────────────────────────
-#define GATEWAY_ID   "esp32_A"          // Unique per gateway (esp32_A / B / C)
-#define WIFI_SSID    "TP-Link_9772"     // WiFi SSID
-#define WIFI_PASS    "99326685"         // WiFi password
-#define MQTT_HOST    "192.168.0.102"    // Backend server IP
+#define GATEWAY_ID   "esp32_B"              // Unique per gateway (esp32_A / B / C)
+#define WIFI_SSID    "David's Galaxy A32"   // WiFi SSID
+#define WIFI_PASS    "boaz1111"             // WiFi password
+#define MQTT_HOST    "192.168.100.222"      // Backend server IP
 #define MQTT_PORT    1883
 #define MQTT_TOPIC   "ire/ble/rssi"
-#define SCAN_TIME    1                  // BLE scan duration (seconds)
+#define SCAN_TIME    1                      // BLE scan duration (seconds)
 
-// IRE app service UUID – only report devices advertising this UUID
-#define IRE_SERVICE_UUID "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+// ── BLE FILTER ──────────────────────────────────────
+#define BLE_NAME_PREFIX  "IRE-"            // Only accept devices whose name starts with this
+#define RSSI_MIN        -150               // Accept signals down to -150 dBm
 
 WiFiClient   wifiClient;
 PubSubClient mqtt(wifiClient);
 BLEScan*     bleScan;
 
 void setup_wifi() {
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     delay(500);
     Serial.print(".");
+    attempts++;
   }
-  Serial.println(" connected!");
-  Serial.println(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println(" connected!");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println(" FAILED!");
+    Serial.print("Status: ");
+    Serial.println(WiFi.status());
+  }
 }
 
 void reconnect_mqtt() {
@@ -66,30 +68,41 @@ void reconnect_mqtt() {
   }
 }
 
+// ── Helper: check if name starts with prefix ────────
+bool hasValidPrefix(const String& name) {
+  if (name.length() == 0) return false;
+  return name.startsWith(BLE_NAME_PREFIX);
+}
+
 // ── BLE callback ────────────────────────────────────
 class ScanCallback : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice device) override {
-    // Only process IRE app devices (filter by service UUID)
-    if (!device.haveServiceUUID() ||
-        !device.isAdvertisingService(BLEUUID(IRE_SERVICE_UUID))) {
+    String name = device.getName().c_str();
+    int    rssi  = device.getRSSI();
+
+    // ── FILTER 1: Must have a name starting with "IRE-" ──
+    if (!hasValidPrefix(name)) {
+      Serial.printf("Skipped (name filter): [%s] RSSI=%d\n",
+                    name.length() > 0 ? name.c_str() : "<no name>", rssi);
       return;
     }
 
-    int rssi = device.getRSSI();
+    // ── FILTER 2: RSSI must be within acceptable range ──
+    if (rssi < RSSI_MIN) {
+      Serial.printf("Skipped (RSSI too low): [%s] RSSI=%d\n", name.c_str(), rssi);
+      return;
+    }
 
-    // Use the advertised device name as session_id (set by the Android app).
-    // Only accept devices whose name starts with "IRE-" (our app's prefix).
-    String name = device.getName().c_str();
-    if (!name.startsWith("IRE-")) return;
-    String sessionId = name;
-
+    // ── Passed all filters → publish ────────────────────
     String payload = "{\"gateway_id\":\"" + String(GATEWAY_ID)
-                   + "\",\"session_id\":\"" + sessionId
-                   + "\",\"rssi\":" + String(rssi) + "}";
+                   + "\",\"session_id\":\"" + name
+                   + "\",\"rssi\":"         + String(rssi) + "}";
 
     if (mqtt.connected()) {
       mqtt.publish(MQTT_TOPIC, payload.c_str());
       Serial.println("Published: " + payload);
+    } else {
+      Serial.println("MQTT not connected – dropped: " + payload);
     }
   }
 };
@@ -107,6 +120,9 @@ void setup() {
   bleScan->setActiveScan(true);
   bleScan->setInterval(100);
   bleScan->setWindow(99);
+
+  Serial.printf("BLE filter: name prefix = \"%s\", RSSI >= %d dBm\n",
+                BLE_NAME_PREFIX, RSSI_MIN);
 }
 
 void loop() {
@@ -114,7 +130,7 @@ void loop() {
   mqtt.loop();
 
   BLEScanResults* results = bleScan->start(SCAN_TIME, false);
-  Serial.printf("Scan complete - %d devices found\n", results->getCount());
+  Serial.printf("Scan complete – %d devices found (pre-filter)\n", results->getCount());
   bleScan->clearResults();
 
   delay(100);

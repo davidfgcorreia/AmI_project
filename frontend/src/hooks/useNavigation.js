@@ -1,13 +1,12 @@
 /**
  * useNavigation - turn-by-turn audio navigation using TTS.
  *
- * Runs on every position update (~10 Hz) to give responsive audio cues.
- * Tracks which path waypoint the user is heading toward and announces
- * turns as they reach each one. On arrival at the target shelf it
- * announces the product name and shelf level.
+ * Runs on every position update to give responsive audio cues.
+ * Announces the product name when navigation starts, then gives
+ * turn directions at each waypoint, and announces arrival.
  */
 import { useEffect, useRef } from 'react';
-import { speak, stopSpeech } from '../services/sound';
+import { speak } from '../services/sound';
 
 // ── Geometry helpers ─────────────────────────────────────────────────────────
 
@@ -15,20 +14,15 @@ function dist(a, b) {
   return Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
 }
 
-/** Angle in degrees from point a to point b (0 = +Y / north, 90 = +X / east). */
 function bearing(a, b) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   return ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
 }
 
-/**
- * Given the bearing of the segment the user is currently on and the bearing
- * of the next segment, return a human-readable turn instruction.
- */
 function turnDirection(fromBearing, toBearing) {
   let delta = ((toBearing - fromBearing) + 360) % 360;
-  if (delta > 180) delta -= 360; // normalise to [-180, 180]
+  if (delta > 180) delta -= 360;
 
   if (Math.abs(delta) < 25) return 'continue straight';
   if (delta > 0 && delta <= 100) return 'turn right';
@@ -39,14 +33,10 @@ function turnDirection(fromBearing, toBearing) {
 
 const LEVEL_NAMES = ['bottom', 'lower', 'middle', 'upper', 'top'];
 function levelName(n) { return LEVEL_NAMES[(n || 1) - 1] || `level ${n}`; }
-
 function capitalise(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-// How close (metres) the user must be to a waypoint to trigger the next instruction
 const WAYPOINT_RADIUS = 1.5;
-// How close to the target shelf to announce arrival
 const ARRIVAL_RADIUS = 1.8;
-// Minimum seconds between spoken instructions to avoid spamming
 const MIN_SPEAK_INTERVAL = 2.0;
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -68,71 +58,67 @@ export default function useNavigation({ userPos, nextItem, path = [], targets = 
     }
   }, [nextItem?.id]);
 
-  // Main navigation loop — runs on every position update
+  // Announce product name once targets are ready
   useEffect(() => {
-    if (!voiceEnabled) { stopSpeech(); return; }
-    if (!userPos || !nextItem || path.length < 2) return;
+    if (!voiceEnabled || !nextItem) return;
+    if (announcedStartRef.current) return;
+
+    const target = targets?.[0];
+    if (userPos && target) {
+      announcedStartRef.current = true;
+      const d = Math.round(dist(userPos, target));
+      speak(`Navigating to ${nextItem.name}, about ${d} metres away.`);
+      lastSpokeRef.current = Date.now() / 1000;
+      waypointIdxRef.current = 1;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextItem?.id, targets?.length, userPos?.x, userPos?.y, voiceEnabled]);
+
+  // Turn-by-turn on position updates
+  useEffect(() => {
+    if (!voiceEnabled || !userPos || !nextItem || path.length < 2) return;
 
     const target = targets?.[0];
     if (!target) return;
+    if (arrivedRef.current) return;
 
     const now = Date.now() / 1000;
     const canSpeak = (now - lastSpokeRef.current) >= MIN_SPEAK_INTERVAL;
 
-    function say(text) {
-      if (!canSpeak) return;
-      speak(text);
-      lastSpokeRef.current = now;
-    }
-
     // ── Arrival check ────────────────────────────────────────────────────
     const dTarget = dist(userPos, target);
-    if (dTarget <= ARRIVAL_RADIUS && !arrivedRef.current) {
+    if (dTarget <= ARRIVAL_RADIUS) {
       arrivedRef.current = true;
       const level = levelName(nextItem.shelf_level);
       speak(`You have arrived. ${nextItem.name} is on the ${level} shelf.`);
       lastSpokeRef.current = now;
       return;
     }
-    if (arrivedRef.current) return;
-
-    // ── Start announcement ───────────────────────────────────────────────
-    if (!announcedStartRef.current) {
-      announcedStartRef.current = true;
-      const remaining = Math.round(dTarget);
-      speak(`Navigating to ${nextItem.name}, about ${remaining} metres away.`);
-      lastSpokeRef.current = now;
-      waypointIdxRef.current = 1;
-      return;
-    }
 
     // ── Waypoint progression ─────────────────────────────────────────────
     let idx = waypointIdxRef.current;
-    if (idx >= path.length) return;
+    if (idx >= path.length || !canSpeak) return;
 
     const dWaypoint = dist(userPos, path[idx]);
-    if (dWaypoint > WAYPOINT_RADIUS) return; // not there yet
+    if (dWaypoint > WAYPOINT_RADIUS) return;
 
-    // User reached waypoint — advance and announce next turn
     const nextIdx = idx + 1;
     if (nextIdx >= path.length) {
-      // Last waypoint is the target — arrival will be handled above
       waypointIdxRef.current = path.length;
       return;
     }
 
-    // Compute turn direction from current segment to next segment
     const fromBear = bearing(path[idx - 1], path[idx]);
     const toBear = bearing(path[idx], path[nextIdx]);
     const turn = turnDirection(fromBear, toBear);
 
     const waypointsLeft = path.length - nextIdx;
     if (waypointsLeft <= 2) {
-      say(`${capitalise(turn)}, almost there.`);
+      speak(`${capitalise(turn)}, almost there.`);
     } else {
-      say(`${capitalise(turn)}.`);
+      speak(`${capitalise(turn)}.`);
     }
-
+    lastSpokeRef.current = now;
     waypointIdxRef.current = nextIdx;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
