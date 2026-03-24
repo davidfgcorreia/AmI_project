@@ -23,6 +23,7 @@ const COLORS = {
   grid: '#e0e0e0',
   shelf: '#90a4ae',
   shelfStroke: '#607d8b',
+  aisle: 'rgba(26,115,232,0.06)',
   path: '#1a73e8',
   user: '#1a73e8',
   userGlow: 'rgba(26,115,232,0.2)',
@@ -59,6 +60,19 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
     const tx = (x, y) => ROTATED ? ox + y * scale : ox + x * scale;
     const ty = (x, y) => ROTATED ? oy + (REAL_W - x) * scale : oy + (STORE_H - y) * scale;
 
+    // Inverse transforms: screen px,py -> real x,y
+    const inv = (px, py) => {
+      if (ROTATED) {
+        const y = (px - ox) / scale;
+        const x = REAL_W - (py - oy) / scale;
+        return { x, y };
+      } else {
+        const x = (px - ox) / scale;
+        const y = STORE_H - (py - oy) / scale;
+        return { x, y };
+      }
+    };
+
     // Clear
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, W, H);
@@ -77,6 +91,29 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.moveTo(tx(0, y), ty(0, y));
       ctx.lineTo(tx(REAL_W, y), ty(REAL_W, y));
       ctx.stroke();
+    }
+
+    // Center aisle highlight (one-meter wide centered vertical column in screen space)
+    const aisleWidth = 1.0; // metres (extent along the store's Y axis)
+    const centerY = REAL_H / 2;
+    const topY = Math.max(0, centerY - aisleWidth / 2);
+    const bottomY = Math.min(REAL_H, centerY + aisleWidth / 2);
+
+    if (bottomY > topY) {
+      ctx.fillStyle = COLORS.aisle;
+      // rectangle spans full X (0..REAL_W) and Y in [topY..bottomY]
+      const corners = [
+        { x: 0, y: topY },
+        { x: REAL_W, y: topY },
+        { x: 0, y: bottomY },
+        { x: REAL_W, y: bottomY },
+      ];
+      const pts = corners.map(c => ({ sx: tx(c.x, c.y), sy: ty(c.x, c.y) }));
+      const minX = Math.min(...pts.map(p => p.sx));
+      const maxX = Math.max(...pts.map(p => p.sx));
+      const minY = Math.min(...pts.map(p => p.sy));
+      const maxY = Math.max(...pts.map(p => p.sy));
+      ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
     }
 
     // Store outline
@@ -176,17 +213,23 @@ export default function FloorMap({ shelves = [], userPos, path = [], targets = [
       ctx.fillText('★', tx(t.x, t.y), ty(t.x, t.y) + 4);
     });
 
-    // User position
-    if (userPos) {
-      const accRadius = (userPos.accuracy || 1.5) * scale;
+    // User position — snap to center X (they only walk down the central aisle).
+    const displayPos = dataRef.current.userPos;
+    if (displayPos) {
+      // enforce center X
+      const snappedX = REAL_W / 2;
+      const px = snappedX;
+      const py = displayPos.y;
+      const accRadius = ((displayPos.accuracy || 1.5) * scale);
+
       ctx.fillStyle = COLORS.userGlow;
       ctx.beginPath();
-      ctx.arc(tx(userPos.x, userPos.y), ty(userPos.x, userPos.y), accRadius, 0, Math.PI * 2);
+      ctx.arc(tx(px, py), ty(px, py), accRadius, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = COLORS.user;
       ctx.beginPath();
-      ctx.arc(tx(userPos.x, userPos.y), ty(userPos.x, userPos.y), 7, 0, Math.PI * 2);
+      ctx.arc(tx(px, py), ty(px, py), 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;

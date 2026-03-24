@@ -3,6 +3,7 @@
  * No technical knowledge required: tap to edit, drag-free forms.
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import PaletteEditor from './PaletteEditor';
 
 const BASE = import.meta.env.VITE_BACKEND_URL || '';
 
@@ -190,6 +191,9 @@ export default function AdminPanel() {
           Products ({products.length})
         </button>
       </div>
+
+      {/* Palette editor for experimenting with theme colors */}
+      <PaletteEditor />
 
       {/* ── SHELVES ── */}
       {section === 'shelves' && (

@@ -1,9 +1,19 @@
 /* ── Global styles ── */
 :root {
-  --primary: #1a73e8;
-  --primary-light: #4a9af5;
-  --bg: #f5f7fa;
-  --surface: #ffffff;
+  /* Palette slots (5 colors) - editable at runtime */
+  --palette-0: #1a73e8; /* primary */
+  --palette-1: #4a9af5; /* primary light */
+  --palette-2: #f5f7fa; /* background */
+  --palette-3: #ffffff; /* surface */
+  --palette-4: #ff8800; /* accent */
+
+  /* Map existing semantic tokens to palette slots for easy theming */
+  --primary: var(--palette-0);
+  --primary-light: var(--palette-1);
+  --bg: var(--palette-2);
+  --surface: var(--palette-3);
+  --accent: var(--palette-4);
+
   --text: #202124;
   --text-secondary: #5f6368;
   --border: #dadce0;
@@ -11,7 +21,6 @@
   --warning: #fbbc04;
   --danger: #ea4335;
   --radius: 12px;
-  --shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
   /* Safe area insets for notch / home indicator */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -27,7 +36,7 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Clash Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -44,6 +53,11 @@ input, textarea, [contenteditable] {
 }
 
 a { color: var(--primary); text-decoration: none; }
+
+/* Ensure form controls inherit the app font (use font shorthand to inherit correctly) */
+button, input, select, textarea, [contenteditable] {
+  font: inherit;
+}
 
 button {
   cursor: pointer;
@@ -173,9 +187,10 @@ input:focus, select:focus { border-color: var(--primary); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 0.4rem 1rem;
-  min-height: 52px;
+  justify-content: center;
+  gap: 0;
+  padding: 0.5rem 1rem;
+  min-height: 44px;
   flex: 1;
   border-radius: 0;
 }

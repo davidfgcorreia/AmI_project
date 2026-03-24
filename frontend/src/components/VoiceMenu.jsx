@@ -30,7 +30,7 @@ export default function VoiceMenu({ nextItem, userPos }) {
   return (
     <div style={{ position: 'relative' }}>
       <button onClick={() => setOpen(s => !s)} title="Voice menu" style={{ fontSize: '0.9rem', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #ccc', background: 'transparent', cursor: 'pointer' }}>
-        ☰
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
       </button>
       {open && (
         <div style={{ position: 'absolute', right: 0, top: '2.2rem', background: 'white', border: '1px solid #ddd', boxShadow: '0 6px 18px rgba(0,0,0,0.08)', borderRadius: 6, zIndex: 40 }}>
