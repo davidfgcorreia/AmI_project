@@ -54,6 +54,12 @@ async def tracking_ws(ws: WebSocket, session_id: str):
                     data = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
+                if data.get("type") == "ping":
+                    try:
+                        await ws.send_json({"type": "pong"})
+                    except Exception:
+                        pass
+                    continue
                 if data.get("type") == "imu":
                     heading = float(data.get("heading", 0.0))
                     steps = int(data.get("steps", 0))

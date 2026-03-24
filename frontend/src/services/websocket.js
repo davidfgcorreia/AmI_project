@@ -7,6 +7,8 @@ let _ws = null;
 let _onPosition = null;
 let _onStatusChange = null;
 let _reconnectTimer = null;
+let _pingInterval = null;
+let _lastMessageAt = 0;
 let _gwWs = null;
 let _onGateways = null;
 
@@ -32,15 +34,29 @@ export function connectTracking(sessionId, onPosition, onStatusChange) {
   _ws.onopen = () => {
     console.log('[WS] Connected:', sessionId);
     _onStatusChange?.(true);
+    _lastMessageAt = Date.now();
+
+    // Ping every 2s — if no message received in 4s, force reconnect
+    clearInterval(_pingInterval);
+    _pingInterval = setInterval(() => {
+      if (_ws && _ws.readyState === WebSocket.OPEN) {
+        if (Date.now() - _lastMessageAt > 4000) {
+          console.log('[WS] No data in 4s — forcing reconnect');
+          _ws.close();
+          return;
+        }
+        try { _ws.send(JSON.stringify({ type: 'ping' })); } catch (e) {}
+      }
+    }, 2000);
   };
 
   _ws.onmessage = (event) => {
+    _lastMessageAt = Date.now();
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'position' && _onPosition) {
         _onPosition(data);
       }
-      // heartbeat: just confirms the connection is alive
     } catch (e) {
       console.error('[WS] Parse error:', e);
     }
@@ -48,6 +64,7 @@ export function connectTracking(sessionId, onPosition, onStatusChange) {
 
   _ws.onclose = () => {
     console.log('[WS] Disconnected – reconnecting in 1 s');
+    clearInterval(_pingInterval);
     _onStatusChange?.(false);
     _reconnectTimer = setTimeout(() => connectTracking(sessionId, onPosition, onStatusChange), 1000);
   };
@@ -113,6 +130,7 @@ export function sendIMU(data) {
 
 export function disconnectTracking() {
   clearTimeout(_reconnectTimer);
+  clearInterval(_pingInterval);
   if (_ws) {
     _ws.onclose = null;      // prevent reconnect
     _ws.close();
