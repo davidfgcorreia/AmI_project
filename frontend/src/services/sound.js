@@ -76,9 +76,18 @@ function ttsAvailable() {
   return _ttsSupported;
 }
 
+function hasNativeTTS() {
+  try { return window.AndroidBridge?.hasNativeTTS?.(); } catch (e) { return false; }
+}
+
 export function speak(text) {
-  if (!text || !ttsAvailable()) return;
-  // Cancel any ongoing speech so instructions don't queue up
+  if (!text) return;
+  // Prefer native Android TTS (WebView doesn't support speechSynthesis)
+  if (hasNativeTTS()) {
+    try { window.AndroidBridge.speak(text); } catch (e) {}
+    return;
+  }
+  if (!ttsAvailable()) return;
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
   utt.rate = 1.0;
@@ -89,5 +98,9 @@ export function speak(text) {
 }
 
 export function stopSpeech() {
+  if (hasNativeTTS()) {
+    try { window.AndroidBridge.stopSpeech(); } catch (e) {}
+    return;
+  }
   if (ttsAvailable()) window.speechSynthesis.cancel();
 }

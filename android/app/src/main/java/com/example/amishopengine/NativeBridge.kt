@@ -12,6 +12,8 @@ class NativeBridge(
     private val sessionManager: SessionManager,
     private val onStartVoice: () -> Unit,
     private val onStopVoice: () -> Unit,
+    private val onSpeak: (String) -> Unit,
+    private val onStopSpeech: () -> Unit,
 ) {
 
     @JavascriptInterface
@@ -28,4 +30,13 @@ class NativeBridge(
 
     @JavascriptInterface
     fun hasNativeSpeech(): Boolean = true
+
+    @JavascriptInterface
+    fun hasNativeTTS(): Boolean = true
+
+    @JavascriptInterface
+    fun speak(text: String) = onSpeak(text)
+
+    @JavascriptInterface
+    fun stopSpeech() = onStopSpeech()
 }
