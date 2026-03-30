@@ -25,7 +25,7 @@ _ble_timestamps: dict[str, dict[str, float]] = {}
 _EMA_ALPHA = 0.62
 
 # Readings older than this are ignored for trilateration.
-_MAX_AGE_S = 4.0
+_MAX_AGE_S = 3.0
 
 
 def get_ble_buffer() -> dict[str, dict[str, float]]:
