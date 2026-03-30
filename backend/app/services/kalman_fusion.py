@@ -89,6 +89,13 @@ class KalmanTracker:
             logger.info("[KALMAN] Init at (%.2f, %.2f)", ble_x, ble_y)
             return
 
+        # Innovation gate: reject BLE if it implies faster than 2.5 m/s (human sprint)
+        innovation_dist = math.hypot(ble_x - self.x[0], ble_y - self.x[1])
+        if innovation_dist > 2.5:
+            logger.warning("[KALMAN] BLE outlier rejected: %.2fm jump from (%.2f,%.2f) to (%.2f,%.2f)",
+                           innovation_dist, self.x[0], self.x[1], ble_x, ble_y)
+            return
+
         if best_rssi is not None:
             r = KALMAN_MEASUREMENT_NOISE * 10 ** ((BLE_TX_POWER - best_rssi) / 20)
             r = max(0.3, min(6.0, r))

@@ -1,0 +1,431 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{subcaption}
+
+% Hyperlink styling
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+% Section formatting
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+
+% ---------------------------------------------------------------
+\begin{document}
+
+% Title block
+\begin{center}
+    {\LARGE\bfseries Intelligent Retail Ecosystem}\\[0.5em]
+    {\large Ambient Intelligence --- Alameda G11}\\[0.5em]
+    David Correia: \texttt{ist1105940} \quad
+    Gonçalo Oliveira: \texttt{ist1116469} \quad
+    Pedro Duarte: \texttt{ist1116390}
+\end{center}
+
+\vspace{1.5em}
+
+
+\begin{center}
+\includegraphics[width=\linewidth]{g11.jpeg}
+\end{center}
+
+% ---------------------------------------------------------------
+\section{Introduction}
+
+This project develops an Ambient Intelligence (AmI) ecosystem to bridge
+the gap between digital inventory and physical navigation. By integrating
+Bluetooth Low Energy (BLE) infrastructure with inertial sensor fusion, the
+solution provides high-precision guidance in high-density retail
+environments like IKEA or supermarkets.
+
+\subsection*{Significance}
+
+Shoppers often face ''search friction'' in massive layouts. Our system
+eliminates this by transforming the store into an interactive assistant.
+Users simply ask their phone for a product, and the system provides a
+optimised path to the next product. By reducing cognitive load, this 'search-to-product' automation creates an intuitive, barrier-free journey for all users.
+
+\subsection*{Objectives}
+
+\begin{itemize}
+    \item \textbf{Precision Localization:} Achieve $<$1.5\,m accuracy using a
+    hybrid engine that fuses BLE trilateration with IMU data and Kalman
+    filtering to overcome shelf interference.
+
+    \item \textbf{Seamless Navigation:} Provide timely pathfinding via a
+    mobile app digital map and audio indications.
+
+    \item \textbf{Micro-Navigation:} Upon arrival at the target shelf, announce the product's precise shelf level via text-to-speech, guiding the user to the correct position.
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{Literature Review}
+
+\begin{figure}[ht!]
+    \hspace{-0.3cm}
+    \includegraphics[width=1.03\linewidth]{scam1.png}
+\end{figure}
+
+
+\textbf{Strengths \& Weaknesses:} A primary strength of this work is its
+empirical validation in high-interference environments. The authors demonstrate
+that by applying an Extended Kalman Filter (EKF) to fuse RSSI (Received Signal
+Strength Indicator) data with step-counting algorithms, they achieve a mean
+accuracy between 0.4\,m and 1.3\,m. This level of precision is significantly
+higher than standard BLE-only approaches. A noted weakness is the heterogeneity
+of mobile hardware; the study observes that different smartphone chipsets vary
+in sensor sensitivity, which can lead to inconsistent PDR performance across
+different user devices unless a robust calibration layer is implemented.
+
+\textbf{Influence on Proposal:} This paper serves as the primary technical benchmark for our "Precision Localization" objective. Following the authors’ evidence that hybrid systems are superior for "cluttered" spaces, this validation directly supports our use of Kalman filtering to stabilize the user’s position on the digital map. By adopting this hybrid methodology, we can reliably offer the "micro-navigation" feature, ensuring the user is accurately positioned within the 1.5 m radius required to trigger the targeted audio notification module. To resolve potential user conflicts in crowded areas, each device advertises a unique Bluetooth signal that serves as an individual identifier. This allows the system to precisely locate each person and provide tailored audio indications based on that specific user’s requests, ensuring a personalized guidance experience even when multiple users are in close proximity.
+
+% ---------------------------------------------------------------
+\section{Problem}
+
+The specific problem being solved is the ``information-location gap'' in
+large-scale indoor environments. While digital inventories know \emph{what} is
+in stock, they often fail to communicate \emph{exactly where} the item is to a
+moving human in a way that is intuitive. In spaces like large supermarkets,
+shoppers face ``search fatigue'' due to complex layouts and similar-looking
+packaging, while staff lose significant time performing manual stock-location
+audits.
+
+\subsection*{Stakeholders}
+
+\begin{itemize}
+    \item \textbf{Shoppers/Visitors:} Individuals looking for specific items
+    who want to minimise time spent wandering.
+
+    \item \textbf{Retail/Warehouse Staff:} Workers responsible for picking
+    orders and maintaining accurate stock location data.
+
+    \item \textbf{Store Managers:} Business owners seeking to increase sales
+    conversion and reduce labour costs associated with inventory management.
+\end{itemize}
+
+\subsection*{Value Added}
+
+\begin{itemize}
+    \item \textbf{Efficiency:} Reduces ``time-to-item'' for shoppers, leading
+    to higher satisfaction and faster throughput.
+
+    \item \textbf{Accuracy:} Eliminates the discrepancy between the digital
+    inventory list and the physical shelf location.
+
+    \item \textbf{Accessibility:} Provides a hands-free, voice-guided
+    experience for users who are physically burdened or have visual
+    impairments.
+\end{itemize}
+
+\subsection{Solution Requirements}
+
+\subsubsection*{R1: Localization \& Tracking}
+\begin{itemize}
+    \item \textbf{R1.1 Precision:} Maintain $<$1.5\,m error to ensure accurate
+    user positioning.
+    \item \textbf{R1.2 Stability:} Prevent the user marker from ``jumping.''
+    \item \textbf{R1.3 Latency:} Recalculate navigation paths within 1.5
+    seconds of user deviation.
+\end{itemize}
+
+\subsubsection*{R2: User Interaction \& Navigation}
+\begin{itemize}
+    \item \textbf{R2.1 Querying:} Support both natural language voice and
+    text-based product searches.
+    \item \textbf{R2.2 Optimization:} Generate the most efficient route for
+    multi-product shopping lists.
+    \item \textbf{R2.3 Wayfinding:} Display a real-time directional path on a
+    digital floor plan.
+    \item \textbf{R2.4 Micro-Navigation:} Identify the item's precise position
+    on the shelf.
+\end{itemize}
+
+\subsubsection*{R3: Platform \& Interface}
+\begin{itemize}
+    \item \textbf{R3.1 Access:} Ensure compatibility with Android.
+\end{itemize}
+
+\subsection{Assumptions}
+
+\begin{itemize}
+    \item \textbf{Hardware:} User smartphones support Bluetooth 4.0+.
+    \item \textbf{Infrastructure:} 3+ ESP32 (with BLE beacon) gateways are
+    elevated to minimise signal interference from obstacles.
+    \item \textbf{Data:} A product database is pre-populated for real-time
+    matching.
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{Prototype}
+
+\subsection{Overview}
+
+The prototype utilises a distributed ambient intelligence (AmI) architecture to
+bridge the gap between digital inventory and physical location. The system is
+divided into three functional layers to ensure high-precision tracking and
+low-latency user feedback:
+
+\begin{itemize}
+    \item \textbf{ESP32 Gateway Network:} Three fixed listeners that scan the
+    environment for the smartphone's BLE signature. They forward raw RSSI
+    (signal strength) data to the backend.
+
+    \item \textbf{Native Mobile Client:} A Kotlin Android application that
+    hosts a React frontend in a WebView. It broadcasts a unique BLE session
+    ID (prefixed with \texttt{IRE-}) in peripheral mode while simultaneously
+    streaming IMU data (step detection via \texttt{TYPE\_STEP\_DETECTOR} and
+    heading via \texttt{TYPE\_ROTATION\_VECTOR}) to the backend through
+    WebSocket packets at approximately 10\,Hz.
+
+    \item \textbf{Central Backend:} A FastAPI Python server that performs
+    sensor fusion using a linear Kalman filter with state
+    $[x, y, v_x, v_y]$, merging absolute BLE trilateration coordinates
+    with relative PDR (Pedestrian Dead Reckoning) movement data. It also
+    provides A* pathfinding with Douglas-Peucker path simplification and
+    nearest-neighbour TSP with 2-opt improvement for multi-product route
+    optimisation.
+\end{itemize}
+
+\subsection{Logical Design}
+
+\begin{enumerate}
+    \item \textbf{Hybrid Localization:} Computes user position by fusing BLE
+    signal strength with IMU sensor data (steps/rotation) for sub-metre
+    stability.
+
+    \item \textbf{Macro-to-Micro Navigation:} Transitions from a 2D floor map
+    (grid-mapped shelves define virtual space) for travel to an indication of
+    the item's precise position on the shelf.
+
+    \item \textbf{Hands-Free Search:} Enables product lookup via natural
+    language voice commands, eliminating manual typing during navigation.
+\end{enumerate}
+
+\subsection{Technology Selection}
+
+% Note: the original document contains a BOM table image here.
+% Recreate it as a LaTeX table or insert the image file if available.
+% \begin{center}
+%     \includegraphics[width=\linewidth]{image1.png}
+% \end{center}
+
+% ---------------------------------------------------------------
+\section{Bill of Materials (BOM)}
+
+\subsection{Hardware}
+
+\begin{itemize}
+    \item \textbf{3$\times$ ESP32 Microcontrollers:} Fixed gateways used for
+    high-frequency signal capture and MQTT data relay (hosted on the laptop).
+
+    \item \textbf{User Smartphone:} The central sensor hub and UI for
+    voice/visual navigation.
+
+    \item \textbf{Central Server (laptop):} Processes heavy computational tasks
+    and position fusion.
+\end{itemize}
+
+\subsection{Software}
+
+\begin{itemize}
+    \item \textbf{React.js:} Frontend UI framework, rendered inside the
+    Android app's WebView. \url{https://react.dev/}
+
+    \item \textbf{FastAPI:} High-performance backend for real-time pathfinding
+    logic. \url{https://fastapi.tiangolo.com/}
+
+    \item \textbf{MQTT \& WebSockets:} Protocols for low-latency hardware and
+    sensor data streaming. \url{https://mqtt.org/} /
+    \url{https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API}
+
+    \item \textbf{SQLite:} Product database. \url{https://www.sqlite.org/}
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{Evaluation}
+
+\subsection{Teamwork}
+
+% TODO: Review how the work was divided by the team.
+The effort put into the development of our solution was, roughly, equally distributed among the three team members:
+\begin{itemize}
+\item \textbf{David Correia:} Initial system design and implementation, BLE trilateration implementation and major tester and troubleshooter (possessed the hardware and the only owner of an Android device).
+\item  \textbf{Gonçalo Oliveira:} Initial hardware setup and troubleshooting, IMU data fusion implementation, Android app development, assistance in testing and calibration.
+\item \textbf{Pedro Duarte:} Digital inventory and store layout implementation, voice search capability implementation, A* pathfinding implementation, front-end development and refinement.
+
+\end{itemize}
+
+\subsection{Results}
+
+% TODO: Present the main results and state which solution requirements
+% from Section 3.1 were satisfied (satisfied / partially satisfied / not satisfied),
+% with brief explanations for each one.
+
+The results of our work were, minding the initial objectives, very satisfactory. Our final prototype consists of three ESP32 boards acting as BLE gateways, a Kotlin Android application that serves as both the user interface and BLE advertiser, and a laptop running the FastAPI backend that performs trilateration, Kalman fusion, and pathfinding. Below we assess each solution requirement defined in Section~3.1.
+
+\subsubsection*{R1: Localization \& Tracking}
+
+\begin{itemize}
+    \item \textbf{R1.1 Precision --- \textit{Satisfied}:}
+    RSSI from the ESP boards alone proved inconsistent, with an estimated error of about 3--3.5\,m, which is consistent with the consulted bibliography. Position calculations with IMU data fusion, on the other hand, had much better results, bringing the accuracy error down to an estimated 1--1.5\,m range. This, paired with constraining the virtual position to walkable paths, ensures reliable user tracking. We believe that adding more BLE-receiving devices would further improve accuracy.
+
+    \item \textbf{R1.2 Stability --- \textit{Partially Satisfied}:}
+    Even with Kalman filtering, marker jumps still exist, even though they are much less extreme and frequent than with BLE trilateration alone. This is partially caused by solid and metallic obstacles in the environment that can reflect and block the BLE signal. This being said, the position is still stable enough for normal usage.
+
+    \item \textbf{R1.3 Latency --- \textit{Satisfied}:}
+    By calculating the full round-trip from the initial sensor broadcast to the TTS output on the user's phone, we confirmed the system meets the required 1.5\,s threshold. The measured total was approximately 1,490\,ms: IMU and app processing ($\sim$300\,ms), beacon scan cycle ($\sim$1,100\,ms), network round-trip ($<$20\,ms), backend fusion ($\sim$50\,ms), and TTS invocation ($\sim$20\,ms).
+\end{itemize}
+
+\subsubsection*{R2: User Interaction \& Navigation}
+
+\begin{itemize}
+    \item \textbf{R2.1 Querying --- \textit{Satisfied}:}
+    Both voice and text-based search were implemented. Voice search uses the native Android \texttt{SpeechRecognizer} for reliable recognition, with a Web Speech API fallback. Text search uses fuzzy matching (combining sequence similarity and word overlap) to handle typos and partial queries. Testing the voice search functionality in a noisy environment was successful.
+
+    \item \textbf{R2.2 Optimization --- \textit{Satisfied}:}
+    An ordered queue with the shortest possible route to collect all items was implemented using a nearest-neighbour TSP heuristic refined with 2-opt local search. The route is recalculated with every new item added, taking into account the user's current position.
+
+    \item \textbf{R2.3 Wayfinding --- \textit{Satisfied}:}
+    A pathway to the item next in queue appears on the map, computed by A* on a 0.25\,m resolution grid with obstacle avoidance around shelf footprints and simplified using the Douglas-Peucker algorithm. The path updates from the user's current position to the designated shelf. Turn-by-turn voice directions are provided via text-to-speech at each waypoint, with an arrival announcement that includes the product's shelf level.
+
+    \item \textbf{R2.4 Micro-Navigation --- \textit{Partially Satisfied}:}
+    Although we decided that using Computer Vision for product recognition and micro-localization within a shelf was out of scope, each product has a \texttt{shelf\_level} parameter in the database indicating its vertical position (bottom through top). Upon arriving within 1.8\,m of the target shelf, the text-to-speech system announces: ``You have arrived. \{product\} is on the \{level\} shelf,'' guiding the user to the correct height.
+\end{itemize}
+
+\subsubsection*{Additional Implemented Features}
+\begin{itemize}
+    \item \textbf{Admin Panel:} A dedicated interface for non-technical staff
+    to manage shelves (add, move, resize, choose circular or rectangular
+    shape) and products (assign to shelves, set shelf level) without
+    requiring backend access.
+
+    \item \textbf{Connection Resilience:} The WebSocket connection includes
+    automatic reconnection with a ping/pong heartbeat (2\,s interval,
+    4\,s timeout) to detect and recover from silent disconnections.
+
+    \item \textbf{BLE Filtering:} Both the ESP32 firmware and the backend
+    filter BLE readings by the \texttt{IRE-} name prefix, ensuring that
+    nearby non-app Bluetooth devices do not interfere with the system.
+
+    \item \textbf{RSSI Smoothing:} Incoming RSSI readings are smoothed
+    using Exponential Moving Average (EMA, $\alpha = 0.65$) in the MQTT
+    buffer before being passed to trilateration.
+\end{itemize}
+
+\subsubsection*{R3: Platform \& Interface}
+
+\begin{itemize}
+    \item \textbf{R3.1 Access --- \textit{Satisfied}:}
+    The application targets Android 12 (API level 31) and above, since Android 12 introduced the \texttt{BLUETOOTH\_ADVERTISE} permission required for BLE peripheral mode. As of early 2026, Android 12+ covers approximately 85--90\% of active devices, ensuring broad compatibility. The prototype was tested on a Samsung Galaxy A32 without any device-specific issues.
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{Conclusion}
+
+The developed Ambient Intelligence ecosystem successfully bridges the gap between digital inventory and physical navigation, meeting the intended 1.5\,m precision range and a round-trip latency of 1.49 seconds through hybrid BLE--IMU Kalman fusion.
+However, the evaluation revealed several areas for future improvement. The 1.1-second beacon scan cycle represents the primary latency bottleneck and should be optimised in future iterations. BLE reliability is also impacted by metallic obstacles; this could be mitigated by adding more ESP32 devices in strategic positions. Finally, integrating computer vision would further close the ``information-location gap'' by identifying a product's precise position on the shelf, beyond the current TTS-based shelf-level guidance.
+
+
+% ---------------------------------------------------------------
+\section{Bibliography}
+
+\begin{itemize}
+    \item Leitch, S.\,G., Ahmed, Q.\,Z., Abbas, W.\,B., Hafeez, M.,
+    Lazaridis, P.\,I., Sureephong, P., \& Alade, T. (2023). ``On Indoor
+    Localization Using WiFi, BLE, UWB, and IMU Technologies.'' \textit{Sensors},
+    23(20), 8598. \url{https://doi.org/10.3390/s23208598}
+
+    \item Todorović, V., Protić, M., Stojanović, D., Stojanović, N., \&
+    Spalević, P. (2025). ``Hybrid BLE--PDR Localization System for Smart Retail
+    Environments.'' \textit{Bulletin of Natural Sciences Research}, 15.
+    \url{https://doi.org/10.5937/bnsr15-62101}
+
+    \item Zhuang, Y., Yang, J., Li, Y., Qi, L., \& El-Sheimy, N. (2016).
+    ``Smartphone-Based Indoor Localization with Bluetooth Low Energy Beacons.''
+    \textit{Sensors}, 16(5), 596. \url{https://doi.org/10.3390/s16050596}
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{Declaration of Use of AI}
+
+All decisions and technical content in this work are our own. AI tools were utilized as follows to support the development process:
+
+
+Claude (Anthropic): Employed to assist in structuring the initial proposal, refining complex technical requirements, and serving as a coding assistant for software implementation.
+
+Gemini (Google): Utilized to refine the report's prose, ensuring professional language and correcting grammatical or linguistic inconsistencies throughout the documentation.
+
+\newpage
+
+\section{Diagrams}
+
+\begin{figure}[ht!]
+    \centering
+    \begin{minipage}{1\linewidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{im1.png}
+        \caption{Architecture and system data flow (Developed with Eraser).}
+        \label{fig:architecture_flow}
+    \end{minipage}
+    
+    \vspace{2em} % Adds some breathing room between the two images
+
+    \begin{minipage}{1\linewidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{im2.png}
+        \caption{BPMN: End-to-End Communication between Mobile App, Server, and ESP32.}
+        \label{fig:bpmn_communication}
+    \end{minipage}
+\end{figure}
+
+\section{App images}
+
+\begin{figure}[htbp]
+     \centering
+     % First Row
+     \begin{subfigure}[b]{0.35\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{loc.png}
+         \caption{Shop Map, whit localization}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[b]{0.35\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{list.png}
+         \caption{Shopping list}
+     \end{subfigure}
+
+     \vspace{0.5cm} % Adds vertical spacing between the rows
+
+     % Second Row
+     \begin{subfigure}[b]{0.35\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{serach.png}
+         \caption{Search menu}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[b]{0.35\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{defs.png}
+         \caption{Definitions menu}
+     \end{subfigure}
+\end{figure}
+
+\end{document}
+
+
