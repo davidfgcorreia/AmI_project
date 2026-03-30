@@ -22,7 +22,7 @@ _ble_timestamps: dict[str, dict[str, float]] = {}
 
 # EMA smoothing factor: 0=never update, 1=no smoothing.
 # 0.65 leans toward responsiveness; lower if the marker jitters too much.
-_EMA_ALPHA = 0.65
+_EMA_ALPHA = 0.62
 
 # Readings older than this are ignored for trilateration.
 _MAX_AGE_S = 4.0
