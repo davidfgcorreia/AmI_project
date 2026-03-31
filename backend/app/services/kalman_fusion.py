@@ -40,6 +40,7 @@ class KalmanTracker:
         ], dtype=float)
 
         self._initialised = False
+        self._rejected_streak = 0
 
     # -- predict ---------------------------------------------------------------
 
@@ -89,12 +90,25 @@ class KalmanTracker:
             logger.info("[KALMAN] Init at (%.2f, %.2f)", ble_x, ble_y)
             return
 
-        # Innovation gate: reject BLE if it implies faster than 2.5 m/s (human sprint)
+        # Innovation gate: reject BLE if it implies faster than 2.5 m/s (human sprint).
+        # After 4 consecutive rejections the filter has drifted — force-accept and re-anchor.
         innovation_dist = math.hypot(ble_x - self.x[0], ble_y - self.x[1])
         if innovation_dist > 2.5:
-            logger.warning("[KALMAN] BLE outlier rejected: %.2fm jump from (%.2f,%.2f) to (%.2f,%.2f)",
-                           innovation_dist, self.x[0], self.x[1], ble_x, ble_y)
+            self._rejected_streak += 1
+            if self._rejected_streak < 2:
+                logger.warning("[KALMAN] BLE outlier rejected (%d/2): %.2fm jump -> (%.2f,%.2f)",
+                               self._rejected_streak, innovation_dist, ble_x, ble_y)
+                return
+            # Too many consecutive rejections — IMU has drifted. Re-anchor to BLE.
+            logger.warning("[KALMAN] 2 rejections — re-anchoring to BLE (%.2f,%.2f)", ble_x, ble_y)
+            self.x[0] = ble_x
+            self.x[1] = ble_y
+            self.x[2] = 0.0
+            self.x[3] = 0.0
+            self.P = np.diag([2.0, 2.0, 1.0, 1.0])
+            self._rejected_streak = 0
             return
+        self._rejected_streak = 0
 
         if best_rssi is not None:
             r = KALMAN_MEASUREMENT_NOISE * 10 ** ((BLE_TX_POWER - best_rssi) / 20)
