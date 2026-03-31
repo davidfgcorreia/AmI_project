@@ -126,14 +126,14 @@ async def _seed_demo_data():
         # Columns spaced evenly across width (10 m), rows across height (5 m).
         SHELF_DEFS = [
             # (category_key,           display_name,            aisle, x,    y   )
-            ("dairy",                  "Dairy & Eggs",           "1",   1.25,  1.25),
-            ("juices",                 "Juices & Drinks",        "1",   3.75,  1.25),
-            ("bakery",                 "Bakery",                 "1",   6.25,  1.25),
-            ("meat_and_fish",          "Meat & Fish",            "1",   8.75,  1.25),
-            ("beverages",              "Beverages",              "2",   1.25,  3.75),
-            ("fruits",                 "Fresh Fruits",           "2",   3.75,  3.75),
-            ("vegetables",             "Fresh Vegetables",       "2",   6.25,  3.75),
-            ("snacks_and_chips",       "Snacks & Chips",         "2",   8.75,  3.75),
+            ("dairy",                  "Dairy & Eggs",           "1",   1.5,  1.5),
+            ("juices",                 "Juices & Drinks",        "1",   3.5,   1.5),
+            ("bakery",                 "Bakery",                 "1",   5.5,   1.5),
+            ("meat_and_fish",          "Meat & Fish",            "1",   7.5,   1.5),
+            ("beverages",              "Beverages",              "2",   1.5,  3.5),
+            ("fruits",                 "Fresh Fruits",           "2",   3.5,  3.5),
+            ("vegetables",             "Fresh Vegetables",       "2",   5.5,  3.5),
+            ("snacks_and_chips",       "Snacks & Chips",         "2",   7.5,  3.5),
         ]
 
         # Price ranges per category (min, max) in €
