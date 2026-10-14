@@ -17,11 +17,15 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 
+// Network credentials are local deployment configuration, not source code.
+#if __has_include("gateway_config.h")
+#include "gateway_config.h"
+#else
+#include "gateway_config.example.h"
+#endif
+
 // ── CONFIGURATION ───────────────────────────────────
 #define GATEWAY_ID   "esp32_B"              // Unique per gateway (esp32_A / B / C)
-#define WIFI_SSID    "David's Galaxy A32"   // WiFi SSID
-#define WIFI_PASS    "boaz1111"             // WiFi password
-#define MQTT_HOST    "192.168.100.222"      // Backend server IP
 #define MQTT_PORT    1883
 #define MQTT_TOPIC   "ire/ble/rssi"
 #define SCAN_TIME    1                      // BLE scan duration (seconds)

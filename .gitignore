@@ -58,3 +58,6 @@ backend/logs/
 desktop.ini
 
 CLAUDE.md
+
+# Local gateway network configuration
+esp32_gateway/gateway_config.h

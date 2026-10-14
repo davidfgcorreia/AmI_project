@@ -232,7 +232,7 @@ Gateway positions are configured per deployment in the same file.
 
 1. Open `esp32_gateway/esp32_gateway.ino` in Arduino IDE
 2. Install **PubSubClient** library
-3. Set `GATEWAY_ID` (`esp32_A`, `esp32_B`, `esp32_C`), WiFi credentials, and MQTT broker IP
+3. Copy `esp32_gateway/gateway_config.example.h` to `esp32_gateway/gateway_config.h`, then set your Wi-Fi credentials and MQTT broker IP in that ignored local file. Set `GATEWAY_ID` (`esp32_A`, `esp32_B`, `esp32_C`) in the sketch.
 4. Flash each of the 3 ESP32 boards with a unique `GATEWAY_ID`
 
 The gateways filter BLE advertisements by the `IRE-` name prefix — only your app's signals are forwarded to MQTT.
